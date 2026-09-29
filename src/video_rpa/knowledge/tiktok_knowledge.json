@@ -9,7 +9,7 @@
         {
           "by": "xpath",
           "value": "//input[@type='file']",
-          "weight": 18
+          "weight": 22
         }
       ]
     },
@@ -19,13 +19,13 @@
       "locators": [
         {
           "by": "xpath",
-          "value": "//*[@id=\"panel-video\"]/div[1]/div[1]/div[1]/div[1]/div[1]/div[2]/button[1]",
-          "weight": 19
+          "value": "//div[@contenteditable='true']",
+          "weight": 26
         },
         {
           "by": "xpath",
-          "value": "//div[@contenteditable='true']",
-          "weight": 12
+          "value": "//*[@id=\"panel-video\"]/div[1]/div[1]/div[1]/div[1]/div[1]/div[2]/button[1]",
+          "weight": 19
         },
         {
           "by": "xpath",
@@ -41,7 +41,7 @@
         {
           "by": "xpath",
           "value": "//button[@data-e2e='post_video_button']",
-          "weight": 18
+          "weight": 22
         },
         {
           "by": "xpath",
@@ -63,7 +63,7 @@
         {
           "by": "xpath",
           "value": "//*[contains(text(), 'Uploaded') or contains(text(), '已發布') or contains(text(), '已發佈')]",
-          "weight": 16
+          "weight": 20
         }
       ]
     }
