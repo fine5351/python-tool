@@ -37,7 +37,7 @@
         {
           "by": "xpath",
           "value": "//input[contains(@placeholder, '请输入稿件标题') or contains(@placeholder, '稿件标题')]",
-          "weight": 29
+          "weight": 39
         },
         {
           "by": "xpath",
@@ -92,7 +92,7 @@
         {
           "by": "css",
           "value": "div.ql-editor[contenteditable='true'][data-placeholder*='填写更全面的相关信息']",
-          "weight": 26
+          "weight": 36
         },
         {
           "by": "xpath",
@@ -121,7 +121,7 @@
         {
           "by": "xpath",
           "value": "//input[contains(@class, 'input-val') and contains(@placeholder, '创建标签')]",
-          "weight": 29
+          "weight": 39
         },
         {
           "by": "xpath",
@@ -137,7 +137,7 @@
         {
           "by": "xpath",
           "value": "//*[contains(@class, 'submit-add') and contains(text(), '立即投稿')]",
-          "weight": 29
+          "weight": 39
         },
         {
           "by": "xpath",
