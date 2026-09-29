@@ -41,7 +41,7 @@
         {
           "by": "xpath",
           "value": "//button[@data-e2e='post_video_button']",
-          "weight": 46
+          "weight": 48
         },
         {
           "by": "xpath",
@@ -63,7 +63,7 @@
         {
           "by": "xpath",
           "value": "//*[contains(text(), 'Uploaded') or contains(text(), '已發布') or contains(text(), '已發佈')]",
-          "weight": 44
+          "weight": 46
         }
       ]
     }
