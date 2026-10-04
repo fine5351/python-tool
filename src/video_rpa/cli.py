@@ -4,6 +4,7 @@ import argparse
 import logging
 import os
 import sys
+from typing import List, Optional
 
 try:
     from dotenv import load_dotenv
@@ -31,58 +32,98 @@ def get_filename_without_extension(file_path: str) -> str:
     return os.path.splitext(os.path.basename(file_path))[0]
 
 
-def process_multi_platform_upload(file_path: str, description: str, playlist: str, bilibili_category: str, hashtags: list, keep_open: bool):
+def process_multi_platform_upload(file_path: str, description: str, playlist: str, bilibili_category: str, hashtags: list, keep_open: bool, target_platforms: Optional[List[str]] = None) -> bool:
     title = get_filename_without_extension(file_path)
     logger.info(f"Starting multi-platform tabbed upload for {title}...")
 
+    if not target_platforms:
+        selected = ["youtube", "bilibili", "rednote", "tiktok"]
+    else:
+        selected = [p.strip().lower() for p in target_platforms if p.strip()]
+        if not selected:
+            selected = ["youtube", "bilibili", "rednote", "tiktok"]
+
+    logger.info(f"Target platforms: {', '.join(selected)}")
+
     driver = None
+    successful_platforms = []
+    failed_platforms = []
+
     try:
         driver = WebDriverUtil.initialize_driver()
         platforms = []
+        is_first_tab = True
+
+        def prepare_tab():
+            nonlocal is_first_tab
+            if is_first_tab:
+                is_first_tab = False
+                return driver.current_window_handle
+            else:
+                driver.switch_to.new_window('tab')
+                return driver.current_window_handle
 
         # 1. YouTube
-        logger.info("Starting YouTube form...")
-        window_yt = driver.current_window_handle
-        yt_service = YouTubeService()
-        platforms.append({"name": "YouTube", "handle": window_yt, "service": yt_service})
-        yt_service.start_upload_form(driver, file_path, title, description, playlist, "PUBLIC", hashtags)
+        if "youtube" in selected:
+            try:
+                logger.info("Starting YouTube form...")
+                window_yt = prepare_tab()
+                yt_service = YouTubeService()
+                yt_service.start_upload_form(driver, file_path, title, description, playlist, "PUBLIC", hashtags)
+                platforms.append({"name": "YouTube", "handle": window_yt, "service": yt_service})
+            except Exception as e:
+                logger.error(f"Failed to start upload form for YouTube: {e}", exc_info=True)
+                failed_platforms.append(f"YouTube (表單初始化失敗: {e})")
 
         # 2. Bilibili
-        logger.info("Starting Bilibili form...")
-        driver.switch_to.new_window('tab')
-        window_bili = driver.current_window_handle
-        bili_service = BilibiliService()
-        platforms.append({"name": "Bilibili", "handle": window_bili, "service": bili_service})
-        bili_service.start_upload_form(driver, file_path, title, description, bilibili_category, hashtags)
+        if "bilibili" in selected:
+            try:
+                logger.info("Starting Bilibili form...")
+                window_bili = prepare_tab()
+                bili_service = BilibiliService()
+                bili_service.start_upload_form(driver, file_path, title, description, bilibili_category, hashtags)
+                platforms.append({"name": "Bilibili", "handle": window_bili, "service": bili_service})
+            except Exception as e:
+                logger.error(f"Failed to start upload form for Bilibili: {e}", exc_info=True)
+                failed_platforms.append(f"Bilibili (表單初始化失敗: {e})")
 
         # 3. rednote
-        logger.info("Starting rednote form...")
-        driver.switch_to.new_window('tab')
-        window_xhs = driver.current_window_handle
-        xhs_service = rednoteService()
-        platforms.append({"name": "rednote", "handle": window_xhs, "service": xhs_service})
-        xhs_service.start_upload_form(driver, file_path, title, description, hashtags)
+        if "rednote" in selected:
+            try:
+                logger.info("Starting rednote form...")
+                window_xhs = prepare_tab()
+                xhs_service = rednoteService()
+                xhs_service.start_upload_form(driver, file_path, title, description, hashtags)
+                platforms.append({"name": "rednote", "handle": window_xhs, "service": xhs_service})
+            except Exception as e:
+                logger.error(f"Failed to start upload form for rednote: {e}", exc_info=True)
+                failed_platforms.append(f"rednote (表單初始化失敗: {e})")
 
         # 4. TikTok
-        logger.info("Starting TikTok form...")
-        driver.switch_to.new_window('tab')
-        window_tiktok = driver.current_window_handle
-        tiktok_service = TikTokService()
-        platforms.append({"name": "TikTok", "handle": window_tiktok, "service": tiktok_service})
-        tiktok_service.start_upload_form(driver, file_path, title, description, hashtags)
+        if "tiktok" in selected:
+            try:
+                logger.info("Starting TikTok form...")
+                window_tiktok = prepare_tab()
+                tiktok_service = TikTokService()
+                tiktok_service.start_upload_form(driver, file_path, title, description, hashtags)
+                platforms.append({"name": "TikTok", "handle": window_tiktok, "service": tiktok_service})
+            except Exception as e:
+                logger.error(f"Failed to start upload form for TikTok: {e}", exc_info=True)
+                failed_platforms.append(f"TikTok (表單初始化失敗: {e})")
 
         # Phase 2: Wait and publish
-        logger.info("All forms submitting. Now waiting for uploads to complete and publishing...")
+        logger.info("All forms submitted. Now waiting for uploads to complete and publishing...")
         for p in platforms:
             try:
                 driver.switch_to.window(p["handle"])
                 logger.info(f"Switching to {p['name']} tab to finish publish...")
                 p["service"].wait_and_publish(driver)
-                logger.info(f"{p['name']} upload completed successfully!")
+                logger.info(f"✅ {p['name']} upload completed successfully!")
+                successful_platforms.append(p["name"])
             except Exception as e:
                 logger.error(f"Failed to publish for {p['name']}: {e}", exc_info=True)
+                failed_platforms.append(f"{p['name']} (發佈階段失敗: {e})")
 
-        logger.info(f"All platforms processing finished for {title}!")
         OperationTrailTracker.get_instance().save_to_file()
 
     except Exception as e:
@@ -93,6 +134,15 @@ def process_multi_platform_upload(file_path: str, description: str, playlist: st
                 driver.quit()
             else:
                 logger.warning("Browser left open for debugging due to --keep-open.")
+
+    logger.info("\n" + "=" * 60)
+    logger.info(f"📊【多平台發佈結果統計】《{title}》")
+    logger.info(f"  ✅ 成功發佈 ({len(successful_platforms)}): {', '.join(successful_platforms) if successful_platforms else '無'}")
+    if failed_platforms:
+        logger.error(f"  ❌ 發佈失敗 ({len(failed_platforms)}): {', '.join(failed_platforms)}")
+    logger.info("=" * 60 + "\n")
+
+    return len(failed_platforms) == 0 and len(successful_platforms) > 0
 
 
 def main():
@@ -130,6 +180,7 @@ def main():
     parser_multi = subparsers.add_parser("multi", parents=[common_parser], help="批次或同時上傳至所有平台")
     parser_multi.add_argument("--playlist", type=str, help="YouTube 播放清單", default="")
     parser_multi.add_argument("--category", type=str, help="Bilibili 分區", default="游戏")
+    parser_multi.add_argument("--platforms", type=str, help="指定發佈平台 (例如: youtube,bilibili)，預設為所有平台", default="")
 
     args = parser.parse_args()
 
@@ -144,6 +195,10 @@ def main():
         return
 
     hashtags = [t.strip() for t in args.tags.split(",")] if args.tags else []
+    target_platforms = [p.strip().lower() for p in args.platforms.split(",")] if getattr(args, "platforms", None) else None
+
+    VIDEO_EXTENSIONS = ('.mp4', '.mkv', '.mov', '.flv', '.avi', '.webm', '.wmv')
+    success = True
 
     try:
         if args.command == "multi" and args.folder:
@@ -152,12 +207,26 @@ def main():
                 logger.error(f"Invalid folder path: {folder}")
                 sys.exit(1)
 
-            files = [os.path.join(folder, f) for f in os.listdir(folder) if os.path.isfile(os.path.join(folder, f))]
+            files = [
+                os.path.join(folder, f)
+                for f in os.listdir(folder)
+                if os.path.isfile(os.path.join(folder, f)) and f.lower().endswith(VIDEO_EXTENSIONS)
+            ]
             files = natsorted(files)
 
+            if not files:
+                logger.warning(f"在目錄 {folder} 中未找到任何影片檔案 (支援副檔名: {', '.join(VIDEO_EXTENSIONS)})。")
+                sys.exit(0)
+
+            all_ok = True
             for f in files:
                 logger.info(f"Processing file in batch: {os.path.basename(f)}")
-                process_multi_platform_upload(f, args.desc, args.playlist, args.category, hashtags, args.keep_open)
+                ok = process_multi_platform_upload(f, args.desc, args.playlist, args.category, hashtags, args.keep_open, target_platforms=target_platforms)
+                if not ok:
+                    all_ok = False
+
+            if not all_ok:
+                sys.exit(1)
             return
 
         if not args.file:
@@ -173,18 +242,21 @@ def main():
 
         if args.command == "youtube":
             service = YouTubeService()
-            service.upload_video(file_path, title, args.desc, args.playlist, args.visibility, hashtags, args.keep_open)
+            success = service.upload_video(file_path, title, args.desc, args.playlist, args.visibility, hashtags, args.keep_open)
         elif args.command == "tiktok":
             service = TikTokService()
-            service.upload_video(file_path, title, args.desc, args.visibility, hashtags, args.keep_open)
+            success = service.upload_video(file_path, title, args.desc, args.visibility, hashtags, args.keep_open)
         elif args.command == "rednote":
             service = rednoteService()
-            service.upload_video(file_path, title, args.desc, hashtags, args.keep_open)
+            success = service.upload_video(file_path, title, args.desc, hashtags, args.keep_open)
         elif args.command == "bilibili":
             service = BilibiliService()
-            service.upload_video(file_path, title, args.desc, args.category, hashtags, args.keep_open)
+            success = service.upload_video(file_path, title, args.desc, args.category, hashtags, args.keep_open)
         elif args.command == "multi":
-            process_multi_platform_upload(file_path, args.desc, args.playlist, args.category, hashtags, args.keep_open)
+            success = process_multi_platform_upload(file_path, args.desc, args.playlist, args.category, hashtags, args.keep_open, target_platforms=target_platforms)
+
+        if not success:
+            sys.exit(1)
 
     finally:
         # 任務結束後輸出 log 表示需要回寫 script 進行固化

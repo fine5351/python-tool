@@ -20,7 +20,7 @@ class HitlHandler:
         // Create top banner
         const banner = document.createElement('div');
         banner.id = '__rpa_banner';
-        banner.innerHTML = `<strong>⚠️ RPA 協助模式：</strong>請用滑鼠直接點擊目標元素，或按 ESC 取消`;
+        banner.textContent = '⚠️ RPA 協助模式：請用滑鼠直接點擊目標元素，或按 ESC 取消';
         banner.style = 'position:fixed;top:10px;left:50%;transform:translateX(-50%);background:#e53935;color:#fff;padding:12px 24px;z-index:9999999;font-size:15px;font-family:sans-serif;border-radius:8px;box-shadow:0 4px 15px rgba(0,0,0,0.4);pointer-events:none;';
         document.body.appendChild(banner);
 

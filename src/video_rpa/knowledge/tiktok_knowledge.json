@@ -9,7 +9,7 @@
         {
           "by": "xpath",
           "value": "//input[@type='file']",
-          "weight": 52
+          "weight": 62
         }
       ]
     },
@@ -20,7 +20,7 @@
         {
           "by": "xpath",
           "value": "//div[@contenteditable='true']",
-          "weight": 60
+          "weight": 70
         },
         {
           "by": "xpath",
@@ -41,7 +41,7 @@
         {
           "by": "xpath",
           "value": "//button[@data-e2e='post_video_button']",
-          "weight": 48
+          "weight": 54
         },
         {
           "by": "xpath",
@@ -63,7 +63,7 @@
         {
           "by": "xpath",
           "value": "//*[contains(text(), 'Uploaded') or contains(text(), '已發布') or contains(text(), '已發佈')]",
-          "weight": 46
+          "weight": 52
         }
       ]
     }

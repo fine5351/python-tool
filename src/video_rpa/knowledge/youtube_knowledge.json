@@ -9,13 +9,8 @@
       "locators": [
         {
           "by": "xpath",
-          "value": "//h1[text()='頻道資訊主頁']",
-          "weight": 50
-        },
-        {
-          "by": "xpath",
           "value": "//tp-yt-paper-button[@id='button' and .//div[contains(text(),'Continue') or contains(text(),'繼續')]]",
-          "weight": 10
+          "weight": 50
         }
       ]
     },
@@ -31,7 +26,7 @@
         {
           "by": "xpath",
           "value": "//ytcp-quick-actions//ytcp-icon-button",
-          "weight": 52
+          "weight": 72
         },
         {
           "by": "xpath",
@@ -68,7 +63,7 @@
         {
           "by": "xpath",
           "value": "//input[@type='file']",
-          "weight": 52
+          "weight": 72
         }
       ]
     },
@@ -79,7 +74,7 @@
         {
           "by": "xpath",
           "value": "//ytcp-social-suggestions-textbox[@id='title-textarea']//div[@id='textbox']",
-          "weight": 48
+          "weight": 62
         },
         {
           "by": "xpath",
@@ -100,7 +95,7 @@
         {
           "by": "xpath",
           "value": "//ytcp-social-suggestions-textbox[@id='description-textarea']//div[@id='textbox']",
-          "weight": 52
+          "weight": 66
         },
         {
           "by": "xpath",
@@ -117,7 +112,7 @@
         {
           "by": "xpath",
           "value": "//ytcp-text-dropdown-trigger//div[contains(@class, 'right-container')]",
-          "weight": 52
+          "weight": 66
         },
         {
           "by": "xpath",
@@ -134,7 +129,7 @@
         {
           "by": "xpath",
           "value": "//ytcp-button[.//div[contains(text(), 'Done') or contains(text(), '完成')]]",
-          "weight": 52
+          "weight": 66
         }
       ]
     },
@@ -145,7 +140,7 @@
         {
           "by": "xpath",
           "value": "//tp-yt-paper-radio-button[@name='VIDEO_MADE_FOR_KIDS_NOT_MFK']",
-          "weight": 52
+          "weight": 66
         },
         {
           "by": "xpath",
@@ -161,7 +156,7 @@
         {
           "by": "xpath",
           "value": "//*[@id='next-button']",
-          "weight": 136
+          "weight": 160
         },
         {
           "by": "xpath",
@@ -182,7 +177,7 @@
         {
           "by": "xpath",
           "value": "//tp-yt-paper-radio-button[@name='PUBLIC']",
-          "weight": 52
+          "weight": 60
         },
         {
           "by": "xpath",
@@ -230,7 +225,7 @@
         {
           "by": "xpath",
           "value": "//*[@id='done-button' and .//*[contains(translate(text(), ' ', ''), '發布') or contains(text(), 'Publish') or contains(text(), '儲存') or contains(text(), 'Save')]]",
-          "weight": 50
+          "weight": 56
         },
         {
           "by": "xpath",
@@ -252,7 +247,7 @@
         {
           "by": "xpath",
           "value": "//ytcp-button[@id='close-button']",
-          "weight": 53
+          "weight": 59
         },
         {
           "by": "xpath",
@@ -274,6 +269,12 @@
       "detect_xpath": "//*[contains(text(), '仍要發布') or contains(text(), 'Publish anyway')]",
       "action": "click",
       "target_xpath": "//*[contains(text(), '仍要發布') or contains(text(), 'Publish anyway')]/ancestor::ytcp-button | //*[contains(text(), '仍要發布') or contains(text(), 'Publish anyway')]"
+    },
+    {
+      "name": "大功告成彈窗",
+      "detect_xpath": "//*[contains(text(), '大功告成')]",
+      "action": "click",
+      "target_xpath": "//*[contains(text(), '知道了')]/ancestor::ytcp-button | //*[contains(text(), '知道了')] | //tp-yt-paper-button[.//div[contains(text(), '知道了')]] | //*[contains(text(), '大功告成')]/ancestor::ytcp-dialog//ytcp-button"
     }
   ]
 }

@@ -56,7 +56,8 @@ class SmartDriver:
 
     def find_smart_element(self, step_id: str, fallback_locators: Optional[List[Dict[str, Any]]] = None,
                            clickable: bool = False, timeout: Optional[int] = None,
-                           custom_timeout: Optional[int] = None) -> Optional[WebElement]:
+                           custom_timeout: Optional[int] = None,
+                           retry_count: int = 0) -> Optional[WebElement]:
         """Finds an element using tiered self-healing strategies:
         Level 0: Check & dismiss known popups
         Level 1: Try stored locators from KnowledgeStore (ordered by weight)
@@ -117,6 +118,10 @@ class SmartDriver:
                     continue
             time.sleep(0.5)
 
+        if is_optional:
+            logger.info(f"步驟 [{step_name}] 為可選步驟且未出現，略過。")
+            return None
+
         logger.warning(f"⚠️ 步驟 [{step_name}] 原定選擇器均未匹配，進入自癒與 AI 診斷模式...")
 
         # Level 2: Multimodal Vision AI Analysis
@@ -133,35 +138,69 @@ class SmartDriver:
                 # Check if AI detected a blocker popup
                 if ai_diagnosis.get("status") == "POPUP_DETECTED":
                     logger.info(f"🤖 AI 偵測到畫面遮蔽彈窗: {ai_diagnosis.get('description')}")
+                    clicked_popup = False
+                    resolved_xpath = None
+
+                    # 1. Try suggested_xpath
                     if ai_diagnosis.get("suggested_xpath"):
                         try:
+                            s_xpath = ai_diagnosis["suggested_xpath"]
                             btn = WebDriverWait(self.driver, 4).until(
-                                EC.element_to_be_clickable((By.XPATH, ai_diagnosis["suggested_xpath"]))
+                                EC.element_to_be_clickable((By.XPATH, s_xpath))
                             )
                             WebDriverUtil.dispatch_click_events(self.driver, btn)
-                            logger.info("AI 建議之彈窗關閉按鈕已點擊，重新搜尋目標...")
-                            time.sleep(1)
-                            # Record AI popup dismissal trail
-                            self.tracker.record_ai_action(
-                                platform=self.platform,
-                                step_id=step_id,
-                                step_name=step_name,
-                                action_type="AI_POPUP_DISMISS",
-                                suggested_xpath=ai_diagnosis["suggested_xpath"],
-                                original_primary=primary_locator,
-                                details=f"AI 偵測到畫面遮蔽彈窗並點擊排解: {ai_diagnosis.get('description')}"
-                            )
-                            # Add to known popups
-                            self.store.add_known_popup(
-                                name=ai_diagnosis.get("blocker_name") or f"Popup_{int(time.time())}",
-                                detect_xpath=ai_diagnosis.get("suggested_xpath"),
-                                action="click",
-                                target_xpath=ai_diagnosis.get("suggested_xpath")
-                            )
-                            # Retry finding the original element
-                            return self.find_smart_element(step_id, fallback_locators, clickable, custom_timeout=5)
+                            clicked_popup = True
+                            resolved_xpath = s_xpath
                         except Exception as e:
                             logger.warning(f"嘗試點擊 AI 識別之彈窗按鈕失敗: {e}")
+
+                    # 2. Try target_text fallback
+                    if not clicked_popup and ai_diagnosis.get("target_text"):
+                        target_t = ai_diagnosis["target_text"].strip()
+                        text_xpath = f"//*[contains(text(), '{target_t}')]/ancestor::ytcp-button | //*[contains(text(), '{target_t}')]/ancestor::button | //*[contains(text(), '{target_t}')]"
+                        try:
+                            btn = WebDriverWait(self.driver, 4).until(
+                                EC.element_to_be_clickable((By.XPATH, text_xpath))
+                            )
+                            WebDriverUtil.dispatch_click_events(self.driver, btn)
+                            clicked_popup = True
+                            resolved_xpath = text_xpath
+                            logger.info(f"透過文字標籤 '{target_t}' 成功點擊彈窗按鈕")
+                        except Exception as e:
+                            logger.warning(f"嘗試依文字標籤點擊彈窗按鈕失敗: {e}")
+
+                    if clicked_popup:
+                        logger.info("AI 建議之彈窗關閉按鈕已點擊，重新搜尋目標...")
+                        time.sleep(1)
+                        # Record AI popup dismissal trail
+                        self.tracker.record_ai_action(
+                            platform=self.platform,
+                            step_id=step_id,
+                            step_name=step_name,
+                            action_type="AI_POPUP_DISMISS",
+                            suggested_xpath=resolved_xpath or "",
+                            original_primary=primary_locator,
+                            details=f"AI 偵測到畫面遮蔽彈窗並點擊排解: {ai_diagnosis.get('description')}"
+                        )
+                        # Add to known popups
+                        if resolved_xpath:
+                            self.store.add_known_popup(
+                                name=ai_diagnosis.get("blocker_name") or f"Popup_{int(time.time())}",
+                                detect_xpath=resolved_xpath,
+                                action="click",
+                                target_xpath=resolved_xpath
+                            )
+                        # Retry finding the original element
+                        if retry_count < 5:
+                            return self.find_smart_element(step_id, fallback_locators, clickable, timeout=effective_timeout, retry_count=retry_count + 1)
+
+                # Check if AI detected that background processing/upload is ongoing
+                if ai_diagnosis.get("status") == "PROCESSING_WAIT":
+                    wait_time = int(ai_diagnosis.get("suggested_wait_seconds", 8))
+                    logger.info(f"⏳ AI 診斷畫面處於處理等待狀態: {ai_diagnosis.get('description')}，等待 {wait_time} 秒後重試...")
+                    time.sleep(wait_time)
+                    if retry_count < 60:
+                        return self.find_smart_element(step_id, fallback_locators, clickable, timeout=effective_timeout, retry_count=retry_count + 1)
 
                 # Check if AI found the target element with high confidence
                 if ai_diagnosis.get("status") == "ELEMENT_FOUND" and ai_diagnosis.get("confidence", 0) >= 0.75:

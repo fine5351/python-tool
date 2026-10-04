@@ -37,7 +37,7 @@
         {
           "by": "xpath",
           "value": "//input[contains(@placeholder, '请输入稿件标题') or contains(@placeholder, '稿件标题')]",
-          "weight": 59
+          "weight": 73
         },
         {
           "by": "xpath",
@@ -59,7 +59,7 @@
         {
           "by": "xpath",
           "value": "//input[@placeholder='请选择符合您视频内容的创作声明' or contains(@placeholder, '创作声明')]",
-          "weight": 14
+          "weight": 20
         }
       ]
     },
@@ -71,7 +71,7 @@
         {
           "by": "xpath",
           "value": "//li[contains(@class, 'bcc-option') and .//span[contains(text(), '内容无需标注')]]",
-          "weight": 14
+          "weight": 20
         },
         {
           "by": "xpath",
@@ -92,7 +92,7 @@
         {
           "by": "css",
           "value": "div.ql-editor[contenteditable='true'][data-placeholder*='填写更全面的相关信息']",
-          "weight": 56
+          "weight": 70
         },
         {
           "by": "xpath",
@@ -109,7 +109,7 @@
         {
           "by": "css",
           "value": ".select-controller",
-          "weight": 14
+          "weight": 18
         }
       ]
     },
@@ -121,7 +121,7 @@
         {
           "by": "xpath",
           "value": "//input[contains(@class, 'input-val') and contains(@placeholder, '创建标签')]",
-          "weight": 59
+          "weight": 73
         },
         {
           "by": "xpath",
@@ -137,7 +137,7 @@
         {
           "by": "xpath",
           "value": "//*[contains(@class, 'submit-add') and contains(text(), '立即投稿')]",
-          "weight": 57
+          "weight": 65
         },
         {
           "by": "xpath",
@@ -180,6 +180,12 @@
       "detect_xpath": "//div[contains(@class, 'modal') or contains(@class, 'dialog')]//span[contains(text(), '完成') or contains(text(), '确定') or contains(text(), '关闭')]",
       "action": "click",
       "target_xpath": "//div[contains(@class, 'modal') or contains(@class, 'dialog')]//span[contains(text(), '完成') or contains(text(), '确定') or contains(text(), '关闭')]"
+    },
+    {
+      "name": "本地未提交視頻草稿提示",
+      "detect_xpath": "//*[contains(text(), '本地浏览器存在') and contains(text(), '未提交的视频')]",
+      "action": "click",
+      "target_xpath": "//*[contains(text(), '不用了') or contains(text(), '放弃') or contains(text(), '放棄')]"
     }
   ]
 }

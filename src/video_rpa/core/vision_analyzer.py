@@ -9,16 +9,18 @@ from typing import Any, Dict, Optional
 logger = logging.getLogger(__name__)
 
 
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass
+
+
 class VisionAnalyzer:
     """Uses Gemini Vision API to analyze browser screenshots, detect unexpected popups,
     and suggest recovery actions or coordinates when Selenium gets stuck."""
 
     def __init__(self, api_key: Optional[str] = None, model_name: str = "gemini-2.5-flash"):
-        try:
-            from dotenv import load_dotenv
-            load_dotenv()
-        except ImportError:
-            pass
         self.api_key = api_key or os.environ.get("GEMINI_API_KEY")
         self.model_name = model_name
         self.client = None

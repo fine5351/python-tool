@@ -133,27 +133,44 @@ class TikTokService:
     def _wait_for_upload_complete(self, driver):
         logger.info("步驟 : 等待影片上傳完成...")
         start_time = time.time()
-        timeout = 600  # Up to 10 minutes
+        timeout = 3600  # Up to 60 minutes
+        completed = False
 
         while time.time() - start_time < timeout:
             is_uploading = False
-            progress_elements = driver.find_elements(By.XPATH, "//div[contains(text(), '%')]")
-            for el in progress_elements:
-                text = el.text
-                if re.match(r".*\d+%.*", text) and "100%" not in text:
-                    is_uploading = True
-                    logger.info(f"TikTok 上傳進度: {text}")
-                    break
+            try:
+                progress_elements = driver.find_elements(By.XPATH, "//div[contains(text(), '%')]")
+                for el in progress_elements:
+                    try:
+                        text = el.text
+                        if re.match(r".*\d+%.*", text) and "100%" not in text:
+                            is_uploading = True
+                            logger.info(f"TikTok 上傳進度: {text}")
+                            break
+                    except Exception:
+                        continue
+            except Exception:
+                pass
 
             if not is_uploading:
-                success_elements = driver.find_elements(
-                    By.XPATH, "//*[contains(text(), 'Uploaded') or contains(text(), '上傳完畢') or contains(text(), '已上傳')]"
-                )
-                if success_elements:
-                    logger.info(f"Upload complete indicator found: {success_elements[0].text}")
-                    break
+                try:
+                    success_elements = driver.find_elements(
+                        By.XPATH, "//*[contains(text(), 'Uploaded') or contains(text(), '上傳完畢') or contains(text(), '已上傳')]"
+                    )
+                    if success_elements:
+                        try:
+                            logger.info(f"Upload complete indicator found: {success_elements[0].text}")
+                        except Exception:
+                            logger.info("Upload complete indicator found.")
+                        completed = True
+                        break
+                except Exception:
+                    pass
 
             time.sleep(2)
+
+        if not completed:
+            raise RuntimeError("TikTok 影片上傳逾時，未能在時限內完成上傳。")
 
         logger.info("Upload complete, waiting 3 seconds for UI to stabilize...")
         time.sleep(3)

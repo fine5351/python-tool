@@ -9,7 +9,7 @@
         {
           "by": "xpath",
           "value": "//input[@type='file']",
-          "weight": 54
+          "weight": 70
         }
       ]
     },
@@ -20,7 +20,7 @@
         {
           "by": "xpath",
           "value": "//input[contains(@placeholder, '填写标题') or contains(@placeholder, '標題')]",
-          "weight": 54
+          "weight": 70
         },
         {
           "by": "xpath",
@@ -36,7 +36,7 @@
         {
           "by": "xpath",
           "value": "//div[contains(@class, 'tiptap') and contains(@class, 'ProseMirror') and @contenteditable='true']",
-          "weight": 54
+          "weight": 70
         },
         {
           "by": "xpath",
@@ -56,13 +56,23 @@
       "locators": [
         {
           "by": "xpath",
+          "value": "//xhs-publish-btn",
+          "weight": 67
+        },
+        {
+          "by": "xpath",
           "value": "//button[contains(@class, 'bg-red') and normalize-space(.)='发布']",
-          "weight": 15
+          "weight": 60
+        },
+        {
+          "by": "xpath",
+          "value": "//xhs-publish-btn//button",
+          "weight": 55
         },
         {
           "by": "xpath",
           "value": "//button[contains(., '发布') and not(contains(., '发布笔记')) and not(contains(., '定时发布'))]",
-          "weight": 14
+          "weight": 50
         },
         {
           "by": "xpath",
@@ -78,11 +88,6 @@
           "by": "xpath",
           "value": "//div[contains(@class, 'publish-video')]//button[contains(., '发布')]",
           "weight": 10
-        },
-        {
-          "by": "xpath",
-          "value": "//xhs-publish-btn",
-          "weight": 50
         }
       ]
     },
@@ -94,7 +99,7 @@
         {
           "by": "xpath",
           "value": "//*[contains(text(), '发布成功') or contains(text(), 'Publish success')]",
-          "weight": 49
+          "weight": 55
         },
         {
           "by": "xpath",

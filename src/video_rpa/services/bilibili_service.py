@@ -67,11 +67,14 @@ class BilibiliService:
         self._upload_file(driver, file_path)
         self._set_title(driver, simplified_title)
         self._set_description(driver, final_description)
+        self._select_category(driver, category)
         self._set_tags(driver, hashtags)
+        self._set_creation_declaration(driver)
 
     def wait_and_publish(self, driver):
         self._ensure_smart_driver(driver)
         self._wait_for_upload_complete(driver)
+        self._set_creation_declaration(driver)
         self._select_cover(driver)
         self._click_submit(driver)
         self._wait_for_success(driver)
@@ -102,6 +105,18 @@ class BilibiliService:
         self.smart_driver.check_and_dismiss_known_popups()
 
         time.sleep(2)
+        # Dismiss any leftover local drafts prompt to guarantee clean single video upload
+        try:
+            cancel_btns = driver.find_elements(By.XPATH, "//*[contains(text(), '不用了') or contains(text(), '放弃') or contains(text(), '放棄')]")
+            for btn in cancel_btns:
+                if btn.is_displayed():
+                    btn.click()
+                    logger.info("已關閉舊有的本地草稿提示，維持乾淨上傳狀態。")
+                    time.sleep(1)
+                    break
+        except Exception:
+            pass
+
         current_url = driver.current_url.lower()
         if "passport.bilibili.com" in current_url or "login" in current_url:
             print("\n" + "=" * 64)
@@ -168,31 +183,40 @@ class BilibiliService:
     def _wait_for_upload_complete(self, driver):
         logger.info("步驟 : 等待影片上傳完成...")
         start_time = time.time()
-        timeout = 600  # Up to 10 minutes for video upload
+        timeout = 3600  # Up to 60 minutes for large video upload
 
         while time.time() - start_time < timeout:
-            # Check for visible upload completion
-            for elem in driver.find_elements(
-                By.XPATH, "//span[contains(@class, 'success') and contains(text(), '上传完成')] | //span[contains(@class, 'text') and contains(text(), '上传完成')]"
-            ):
-                if elem.is_displayed():
-                    logger.info(f"Bilibili 影片上傳完成 ({elem.text.strip()})")
-                    return
-
-            # Check visible progress text
-            for el in driver.find_elements(By.XPATH, "//span[contains(@class, 'progress-text')]"):
-                if el.is_displayed():
-                    text = el.text.strip()
-                    if text:
-                        logger.info(f"Bilibili 上傳進度: {text}")
-                        if "100%" in text:
-                            time.sleep(2)
+            try:
+                # Check for visible upload completion
+                for elem in driver.find_elements(
+                    By.XPATH, "//span[contains(@class, 'success') and contains(text(), '上传完成')] | //span[contains(@class, 'text') and contains(text(), '上传完成')]"
+                ):
+                    try:
+                        if elem.is_displayed():
+                            logger.info(f"Bilibili 影片上傳完成 ({elem.text.strip()})")
                             return
-                        break
+                    except Exception:
+                        continue
+
+                # Check visible progress text
+                for el in driver.find_elements(By.XPATH, "//span[contains(@class, 'progress-text')]"):
+                    try:
+                        if el.is_displayed():
+                            text = el.text.strip()
+                            if text:
+                                logger.info(f"Bilibili 上傳進度: {text}")
+                                if "100%" in text:
+                                    time.sleep(2)
+                                    return
+                                break
+                    except Exception:
+                        continue
+            except Exception:
+                pass
 
             time.sleep(2)
 
-        logger.warning("上傳等待超過超時時間，嘗試繼續發佈流程...")
+        raise RuntimeError("Bilibili 影片上傳逾時，未能在時限內完成上傳。")
 
     def _set_title(self, driver, title: str):
         if not title:
@@ -273,22 +297,94 @@ class BilibiliService:
         except Exception as e:
             logger.warning(f"Could not set tags: {e}")
 
+    def _wait_for_upload_complete(self, driver, timeout: int = 3600):
+        logger.info("步驟 : 等待 Bilibili 影片上傳完成...")
+        start_time = time.time()
+        last_logged = 0
+
+        while time.time() - start_time < timeout:
+            self.smart_driver.check_and_dismiss_known_popups()
+
+            # Check 1: Check active uploading status
+            uploading_elements = driver.find_elements(
+                By.XPATH,
+                "//*[contains(text(), '上传中') or contains(text(), '已经上传') or contains(text(), '当前速度')]"
+            )
+            is_uploading = False
+            for el in uploading_elements:
+                try:
+                    if el.is_displayed():
+                        text = el.text.strip()
+                        if text:
+                            is_uploading = True
+                            now = time.time()
+                            if now - last_logged > 15:
+                                logger.info(f"Bilibili 上傳進度: {text}")
+                                last_logged = now
+                            break
+                except Exception:
+                    continue
+
+            if not is_uploading:
+                # Check 2: Check explicit completion indicators or submit button active
+                complete_elements = driver.find_elements(
+                    By.XPATH,
+                    "//*[contains(text(), '上传完成') or contains(text(), '转码中') or contains(text(), '重新上传') or contains(text(), '重新上傳')]"
+                )
+                if any(el.is_displayed() for el in complete_elements):
+                    logger.info("檢測到 Bilibili 影片上傳完成/進入轉碼階段！")
+                    time.sleep(2)
+                    return
+
+                # Check 3: Check if submit button is present and not disabled
+                submit_buttons = driver.find_elements(By.XPATH, "//*[contains(@class, 'submit-add') and contains(text(), '立即投稿')]")
+                for btn in submit_buttons:
+                    try:
+                        if btn.is_displayed():
+                            btn_class = btn.get_attribute("class") or ""
+                            disabled = btn.get_attribute("disabled")
+                            if "disabled" not in btn_class and not disabled:
+                                logger.info("檢測到 Bilibili 立即投稿按鈕已啟用，影片上傳判定完成！")
+                                time.sleep(2)
+                                return
+                    except Exception:
+                        pass
+
+            time.sleep(3)
+
+        raise RuntimeError("Bilibili 影片上傳等待超過超時時間 (3600s)。")
+
     def _click_submit(self, driver):
         logger.info("步驟 : 點擊立即投稿按鈕...")
         self.smart_driver.check_and_dismiss_known_popups()
-        submit_btn = self.smart_driver.find_smart_element("submit_button", timeout=15)
-        if submit_btn:
-            try:
-                driver.execute_script("arguments[0].scrollIntoView({behavior: 'smooth', block: 'center'});", submit_btn)
-                time.sleep(1)
-                driver.execute_script("arguments[0].click();", submit_btn)
-                logger.info("已點擊立即投稿按鈕。")
-                return
-            except Exception as e:
-                logger.warning(f"腳本點擊投稿按鈕失敗，改用原生點擊: {e}")
-                submit_btn.click()
-                return
-        raise RuntimeError("無法點擊 Bilibili 立即投稿按鈕。")
+        for attempt in range(1, 15):
+            submit_btn = self.smart_driver.find_smart_element("submit_button", timeout=10)
+            if submit_btn:
+                btn_class = submit_btn.get_attribute("class") or ""
+                disabled = submit_btn.get_attribute("disabled")
+                if "disabled" in btn_class or disabled:
+                    logger.info(f"投稿按鈕尚未啟用 (disabled)，等待中... ({attempt}/14)")
+                    time.sleep(2)
+                    continue
+                try:
+                    driver.execute_script("arguments[0].scrollIntoView({behavior: 'smooth', block: 'center'});", submit_btn)
+                    time.sleep(1)
+                    # Trigger native click, event dispatch, and JS click
+                    try:
+                        submit_btn.click()
+                    except Exception:
+                        pass
+                    try:
+                        WebDriverUtil.dispatch_click_events(driver, submit_btn)
+                    except Exception:
+                        pass
+                    driver.execute_script("arguments[0].click();", submit_btn)
+                    logger.info("已點擊立即投稿按鈕。")
+                    return
+                except Exception as e:
+                    logger.warning(f"點擊投稿按鈕失敗: {e}")
+            time.sleep(1)
+        raise RuntimeError("無法點擊 Bilibili 立即投稿按鈕 (按鈕可能持續處於禁用狀態)。")
 
     def _set_creation_declaration(self, driver):
         logger.info("步驟 : 設定創作聲明...")
@@ -303,7 +399,8 @@ class BilibiliService:
     def _wait_for_success(self, driver):
         logger.info("步驟 : 等待發佈成功狀態或頁面跳轉...")
         start_time = time.time()
-        timeout = 30  # 30 seconds timeout to prevent infinite hanging
+        timeout = 90  # 90 seconds timeout
+        last_click = time.time()
 
         while time.time() - start_time < timeout:
             # Check 1: URL redirected to manager or result page
@@ -314,18 +411,49 @@ class BilibiliService:
                 return
 
             # Check 2: Success text indicator on screen (must be displayed)
-            success_elems = driver.find_elements(By.XPATH, "//*[contains(text(), '稿件投递成功') or contains(text(), '查看稿件')]")
+            success_elems = driver.find_elements(
+                By.XPATH,
+                "//*[contains(text(), '稿件投递成功') or contains(text(), '查看稿件') or contains(text(), '投稿成功') or contains(text(), '再投一个')]"
+            )
             for elem in success_elems:
-                if elem.is_displayed():
-                    logger.info(f"檢測到投稿成功訊息元件: '{elem.text.strip()}'，投稿確認成功！")
-                    time.sleep(3)
-                    return
+                try:
+                    if elem.is_displayed():
+                        logger.info(f"檢測到投稿成功訊息元件: '{elem.text.strip()}'，投稿確認成功！")
+                        time.sleep(3)
+                        return
+                except Exception:
+                    continue
 
             # Check 3: Known popups
             self.smart_driver.check_and_dismiss_known_popups()
-            time.sleep(1.5)
 
-        logger.warning("等待發佈結果達逾時時間，請確認稿件管理後台。")
+            # Retry click submit if still on upload frame after 15s
+            if time.time() - last_click > 15:
+                try:
+                    submit_buttons = driver.find_elements(By.XPATH, "//*[contains(@class, 'submit-add') and contains(text(), '立即投稿')]")
+                    for b in submit_buttons:
+                        if b.is_displayed():
+                            logger.info("投稿按鈕仍在畫面中，嘗試再次點擊...")
+                            try:
+                                b.click()
+                            except Exception:
+                                pass
+                            WebDriverUtil.dispatch_click_events(driver, b)
+                            last_click = time.time()
+                            break
+                except Exception:
+                    pass
+
+            time.sleep(2)
+
+        logger.error(f"Bilibili 投稿確認逾時。當前網址: {driver.current_url}")
+        try:
+            body_snippet = driver.find_element(By.TAG_NAME, "body").text[:500]
+            logger.error(f"頁面文字摘錄: {body_snippet}")
+        except Exception:
+            pass
+
+        raise RuntimeError("Bilibili 稿件未能成功發佈或投稿確認逾時，請確認稿件管理後台。")
 
     def _select_cover(self, driver):
         logger.info("步驟 : 選擇影片推薦封面...")

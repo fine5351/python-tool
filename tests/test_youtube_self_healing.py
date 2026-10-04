@@ -244,6 +244,36 @@ class TestYouTubeServiceIntegration(unittest.TestCase):
         self.assertIn("#rpa", desc)
         self.assertIn("這是測試說明", desc)
 
+    def test_wait_for_upload_complete_detects_complete(self):
+        service = YouTubeService()
+        mock_driver = MagicMock()
+        mock_smart = MagicMock()
+        service.smart_driver = mock_smart
+        mock_complete = MagicMock()
+        mock_complete.is_displayed.return_value = True
+        mock_driver.find_elements.side_effect = [
+            [],  # progress_elements
+            [mock_complete]  # complete_elements
+        ]
+        # Should return cleanly without exception
+        service._wait_for_upload_complete(mock_driver, timeout=5)
+
+
+class TestBilibiliServiceIntegration(unittest.TestCase):
+    def test_service_initialization(self):
+        from video_rpa.services.bilibili_service import BilibiliService
+        service = BilibiliService()
+        self.assertIsNotNone(service.store)
+        self.assertIsNotNone(service.vision)
+        step = service.store.get_step("submit_button")
+        self.assertIsNotNone(step)
+
+    def test_build_description(self):
+        from video_rpa.services.bilibili_service import BilibiliService
+        service = BilibiliService()
+        desc = service._build_description("原神 測試", "說明內容", ["tag1"])
+        self.assertIn("tag1", desc)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -24,17 +24,34 @@ class WebDriverUtil:
     @staticmethod
     def _cleanup_chrome(data_dir: str):
         try:
-            # Surgical kill: Only target chrome.exe using our specific data directory
-            norm_dir = data_dir.replace('/', '\\')
-            alt_dir = data_dir.replace('\\', '/')
+            norm_dir = os.path.normpath(data_dir).lower()
+            temp_dir_name = "chrome_rpa_temp"
 
-            ps_cmd = (
-                f'powershell -Command "Get-CimInstance Win32_Process -Filter \\"Name = \'chrome.exe\'\\" | '
-                f'Where-Object {{ $_.CommandLine -like \'*--user-data-dir={norm_dir}*\' -or $_.CommandLine -like \'*--user-data-dir={alt_dir}*\' }} | '
-                f'Stop-Process -Force"'
-            )
-            logger.info(f"Cleanup: Killing existing Chrome processes using {data_dir}...")
-            subprocess.run(ps_cmd, shell=True, capture_output=True)
+            # Surgical kill using psutil first if available
+            killed = False
+            try:
+                import psutil
+                for p in psutil.process_iter(['name', 'cmdline']):
+                    try:
+                        if p.info['name'] and 'chrome' in p.info['name'].lower():
+                            cmdline = " ".join(p.info['cmdline'] or []).lower()
+                            if norm_dir in cmdline or temp_dir_name in cmdline:
+                                p.kill()
+                                killed = True
+                    except (psutil.NoSuchProcess, psutil.AccessDenied):
+                        pass
+            except ImportError:
+                pass
+
+            if not killed:
+                alt_dir = data_dir.replace('\\', '/')
+                ps_cmd = (
+                    f'powershell -Command "Get-CimInstance Win32_Process -Filter \\"Name = \'chrome.exe\'\\" | '
+                    f'Where-Object {{ `$_.CommandLine -like \'*--user-data-dir={norm_dir}*\' -or `$_.CommandLine -like \'*--user-data-dir={alt_dir}*\' -or `$_.CommandLine -like \'*chrome_rpa_temp*\' }} | '
+                    f'Stop-Process -Force"'
+                )
+                logger.info(f"Cleanup: Killing existing Chrome processes using {data_dir}...")
+                subprocess.run(ps_cmd, shell=True, capture_output=True)
 
             # Kill any orphaned chromedrivers
             subprocess.run('taskkill /F /IM chromedriver.exe /T', shell=True, capture_output=True)
@@ -84,15 +101,12 @@ class WebDriverUtil:
                 return None
 
     @staticmethod
-    def initialize_driver() -> webdriver.Chrome:
-        # Normalize path for Windows
-        data_dir = os.path.normpath(WebDriverUtil.CHROME_DATA_DIR)
-
-        # Always cleanup before starting
-        WebDriverUtil._cleanup_chrome(data_dir)
-
+    def _create_options(user_data_dir: str, binary_location: Optional[str] = None) -> Options:
         options = Options()
-        options.add_argument(f"--user-data-dir={data_dir}")
+        if binary_location and os.path.exists(binary_location):
+            options.binary_location = binary_location
+
+        options.add_argument(f"--user-data-dir={user_data_dir}")
         options.add_argument("--disable-blink-features=AutomationControlled")
         options.add_experimental_option("excludeSwitches", ["enable-automation", "enable-logging"])
         options.add_argument("--no-sandbox")
@@ -103,14 +117,22 @@ class WebDriverUtil:
         options.add_argument("--disable-gpu-compositing")
         options.add_argument("--no-zygote")
         options.add_argument("--remote-allow-origins=*")
-        options.add_argument("--remote-debugging-port=9222")
         options.add_argument("--disable-extensions")
         options.add_argument("--start-maximized")
+        return options
 
-        # Explicitly set binary location if standard path exists
+    @staticmethod
+    def initialize_driver() -> webdriver.Chrome:
+        # Normalize path for Windows
+        data_dir = os.path.normpath(WebDriverUtil.CHROME_DATA_DIR)
+
+        # Always cleanup before starting
+        WebDriverUtil._cleanup_chrome(data_dir)
+
         chrome_path = r"C:\Program Files\Google\Chrome\Application\chrome.exe"
-        if os.path.exists(chrome_path):
-            options.binary_location = chrome_path
+        binary_location = chrome_path if os.path.exists(chrome_path) else None
+
+        options = WebDriverUtil._create_options(data_dir, binary_location)
 
         # Detect version to avoid WDM downloading wrong version
         chrome_version = WebDriverUtil.get_chrome_version()
@@ -132,10 +154,10 @@ class WebDriverUtil:
                 os.makedirs(temp_dir)
 
             logger.info(f"Attempting launch with TEMPORARY profile: {temp_dir}")
-            options.arguments[0] = f"--user-data-dir={temp_dir}"
+            temp_options = WebDriverUtil._create_options(temp_dir, binary_location)
 
             try:
-                return webdriver.Chrome(service=service, options=options)
+                return webdriver.Chrome(service=service, options=temp_options)
             except Exception as e2:
                 logger.error(f"Critical failure: Chrome cannot start even with a fresh profile. Error: {e2}")
                 raise e2

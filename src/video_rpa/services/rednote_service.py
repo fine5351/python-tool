@@ -141,27 +141,38 @@ class rednoteService:
     def _wait_for_upload_complete(self, driver):
         logger.info("步驟 : 等待影片上傳完成...")
         start_time = time.time()
-        timeout = 600  # Up to 10 minutes
+        timeout = 3600  # Up to 60 minutes
 
         while time.time() - start_time < timeout:
             is_uploading = False
-            progress_elements = driver.find_elements(By.XPATH, "//*[contains(text(), '%')]")
-            for el in progress_elements:
-                text = el.text
-                if re.match(r".*\d+%.*", text) and "100%" not in text:
-                    is_uploading = True
-                    logger.info(f"rednote 上傳進度: {text}")
-                    break
+            try:
+                progress_elements = driver.find_elements(By.XPATH, "//*[contains(text(), '%')]")
+                for el in progress_elements:
+                    try:
+                        text = el.text
+                        if re.match(r".*\d+%.*", text) and "100%" not in text:
+                            is_uploading = True
+                            logger.info(f"rednote 上傳進度: {text}")
+                            break
+                    except Exception:
+                        continue
+            except Exception:
+                pass
 
             if not is_uploading:
-                success_elements = driver.find_elements(
-                    By.XPATH, "//*[contains(text(), '上传成功') or contains(text(), 'Upload success') or contains(text(), '检测为高清视频') or contains(text(), '视频分辨率较低')]"
-                )
-                if success_elements:
-                    logger.info("Upload complete.")
-                    break
+                try:
+                    success_elements = driver.find_elements(
+                        By.XPATH, "//*[contains(text(), '上传成功') or contains(text(), 'Upload success') or contains(text(), '检测为高清视频') or contains(text(), '视频分辨率较低')]"
+                    )
+                    if success_elements:
+                        logger.info("Upload complete.")
+                        return
+                except Exception:
+                    pass
 
             time.sleep(2)
+
+        raise RuntimeError("小紅書影片上傳逾時，未能在時限內完成上傳。")
 
     def _set_title(self, driver, title: str):
         if not title:
@@ -242,11 +253,18 @@ class rednoteService:
     def _wait_for_publish_complete(self, driver):
         logger.info("步驟 : 等待發佈前準備完成...")
         for _ in range(30):
-            progress_elements = driver.find_elements(By.XPATH, "//div[contains(text(), '上传中')]")
-            if progress_elements and progress_elements[0].is_displayed():
-                logger.info(f"rednote publish progress: {progress_elements[0].text.strip()}")
-                time.sleep(2)
-            else:
+            try:
+                progress_elements = driver.find_elements(By.XPATH, "//div[contains(text(), '上传中')]")
+                if progress_elements:
+                    try:
+                        if progress_elements[0].is_displayed():
+                            logger.info(f"rednote publish progress: {progress_elements[0].text.strip()}")
+                            time.sleep(2)
+                            continue
+                    except Exception:
+                        pass
+                break
+            except Exception:
                 break
 
     def _click_publish(self, driver):
@@ -260,16 +278,29 @@ class rednoteService:
         driver.execute_script("arguments[0].scrollIntoView({behavior: 'smooth', block: 'center'});", publish_elem)
         time.sleep(1)
 
+        # Wait up to 60s for submit-disabled to become false/cleared
+        logger.info("等待小紅書發佈按鈕啟用 (submit-disabled='false')...")
+        for _ in range(60):
+            try:
+                disabled = driver.execute_script("return arguments[0].getAttribute('submit-disabled');", publish_elem)
+                if disabled != "true":
+                    logger.info("發佈按鈕已就緒 (啟用狀態)！")
+                    break
+            except Exception:
+                break
+            time.sleep(1)
+
+        from selenium.webdriver.common.action_chains import ActionChains
         try:
             if publish_elem.tag_name.lower() == "xhs-publish-btn":
-                from selenium.webdriver.common.action_chains import ActionChains
                 actions = ActionChains(driver)
-                actions.move_to_element(publish_elem).move_by_offset(80, 0).click().perform()
-                logger.info("Clicked xhs-publish-btn at offset (80, 0).")
+                actions.move_to_element(publish_elem).move_by_offset(72, 0).click().perform()
+                logger.info("已點擊 xhs-publish-btn 發佈區域 (offset 72, 0)。")
             else:
                 publish_elem.click()
+                logger.info(f"已點擊發佈按鈕 ({publish_elem.tag_name})。")
         except Exception as click_err:
-            logger.warning(f"Primary click failed: {click_err}. Trying JS click...")
+            logger.warning(f"原生點擊失敗: {click_err}，嘗試 dispatch/JS 點擊...")
             try:
                 WebDriverUtil.dispatch_click_events(driver, publish_elem)
             except Exception:
@@ -277,9 +308,11 @@ class rednoteService:
 
         logger.info("已送出點擊發佈，等待發佈結果確認...")
 
-        # Wait for publish success indicator or redirect
+        # Wait for publish success indicator or redirect (up to 90s for large files)
         start_time = time.time()
-        while time.time() - start_time < 25:
+        last_click = time.time()
+        while time.time() - start_time < 90:
+            self.smart_driver.check_and_dismiss_known_popups()
             current_url = driver.current_url.lower()
             if "note-manager" in current_url:
                 logger.info("檢測到頁面已成功跳轉至筆記管理，發佈完成！")
@@ -294,12 +327,25 @@ class rednoteService:
 
             try:
                 body_text = driver.find_element(By.TAG_NAME, "body").text
-                if "发布成功" in body_text:
+                if "发布成功" in body_text or "已发布" in body_text:
                     logger.info("頁面文字檢測到發佈成功。")
                     time.sleep(3)
                     return
             except Exception:
                 pass
+
+            # Retry click after 8 seconds if still on page and button is enabled
+            if time.time() - last_click > 8:
+                try:
+                    disabled = driver.execute_script("return arguments[0].getAttribute('submit-disabled');", publish_elem)
+                    if disabled != "true":
+                        actions = ActionChains(driver)
+                        actions.move_to_element(publish_elem).move_by_offset(72, 0).click().perform()
+                        logger.info("重試點擊 xhs-publish-btn (offset 72, 0)...")
+                        last_click = time.time()
+                except Exception:
+                    pass
+
             time.sleep(2)
 
         raise RuntimeError("小紅書發佈未在時間內確認成功，請檢查畫面或草稿箱。")
