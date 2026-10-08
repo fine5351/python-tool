@@ -11,9 +11,10 @@
   - 由 TypeSafe AI Jev 模型驅動，非自回歸（Non-autoregressive）結構化單 Pass 決策。
   - 固定以 **0.25 秒（4 Hz）** 極速分析當前遊戲畫面與戰況特徵。
   - 支援 `Choice`（動作選擇）、`Noul`（布林判定，如攻擊前搖閃避）、`Score`（緊急度打分），延遲僅 70~500ms，徹底突破傳統 LLM 需耗時 2~5 秒無法即時操作的瓶頸。
-- 🧠 **Gemini 3.8 Flash 輔助認知 (System 2 - Slow Thinking)**：
-  - 轉為輔助引擎，升級至最新的 **`gemini-3.8-flash`**。
-  - 優先處理使用者自然語言需求（語音 STT 或文字發問），將宏觀目標拆解為可供 Jev 執行的戰術指示（Directive），並支援深度裝備/聖遺物與地圖解謎多模態視覺剖析。
+- 🧠 **Gemini 3.8 Flash 輔助認知 (System 2 - Slow Thinking & Reasoning)**：
+  - 全面遷移至最新世代的 **`gemini-3.8-flash`**（具備 1M Token 上下文與 64K Output，針對 Agentic 自主工作流特化）。
+  - 原生語意化思考深度控制 (`thinking_level`: `MINIMAL` / `LOW` / `MEDIUM` / `HIGH`)：語音翻譯採取 `MINIMAL` 極速確定性輸出；戰術拆解與深度畫面剖析採取 `MEDIUM` / `HIGH` 深度慢思考，完美平衡延遲與高維認知。
+  - 原生支援結構化 JSON 輸出與多模態即時畫面直讀，將宏觀目標精確拆解為 Jev 可執行的戰術指示（Directive）。
 
 ### 2. 策略模式架構 (Strategy Pattern)
 將遊戲輔助能力全面解耦為獨立 Strategy 類別，並由 `StrategyRegistry` 統一管理，保有極佳的未來遊戲擴充能力：

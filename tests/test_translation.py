@@ -132,6 +132,9 @@ class TestGeminiAuxiliaryEngineTranslation(unittest.TestCase):
         mock_client.models.generate_content.return_value = mock_resp
 
         self.engine.client = mock_client
+        res = self.engine.translate_voice_text("左翼請求支援", "英文")
+        self.assertEqual(res, "Need assistance on the left flank!")
+        self.assertTrue(mock_client.models.generate_content.called)
     def test_offline_voice_translation_multilingual(self):
         # 測試日文、韓文、俄文快速溝通術語降級
         self.assertEqual(self.engine.translate_voice_text("救我", "日文"), "助けて！")

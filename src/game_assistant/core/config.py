@@ -46,9 +46,12 @@ STT_PHRASE_TIME_LIMIT = 8     # 單次發言長度上限 (秒)
 
 # 人類神經系統架構設定 (Jev 反射神經 System 1 + Gemini 大腦 System 2)
 class ThinkingEffortLevel(str, Enum):
-    """Gemini 大腦思考深度分級"""
-    MEDIUM = "medium"  # 簡單相似問題快速思考 (Gemini effort medium)
-    MAX = "max"        # 從未遇過的新問題仔細思考 (Gemini effort max / Deep Thinking)
+    """Gemini 3.8 Flash 大腦思考深度分級 (Thinking Level)"""
+    MINIMAL = "minimal"  # 極速無思考延遲 (Gemini 3.8 Flash minimal，適用即時語音翻譯)
+    LOW = "low"          # 輕量快速思考 (Gemini 3.8 Flash low)
+    MEDIUM = "medium"    # 簡單相似問題標準思考 (Gemini 3.8 Flash medium)
+    MAX = "max"          # 從未遇過的新問題仔細深思 (Gemini 3.8 Flash high / Deep Thinking)
+    HIGH = "high"        # MAX 相容別名
 
 REFLEX_CONFIDENCE_THRESHOLD = 0.70   # Jev 反射神經置信度門檻 (低於此門檻自動上升大腦思考)
 NOVELTY_SIMILARITY_THRESHOLD = 0.45  # 相似度判定門檻 (>=此值為相似問題用 medium，否則為新問題用 max)

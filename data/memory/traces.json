@@ -3163,8 +3163,8 @@
         ]
       }
     },
-    "is_consolidated": false,
-    "consolidation_arc_id": null
+    "is_consolidated": true,
+    "consolidation_arc_id": "arc_learned_dash_dodge_為什_1790683133_0"
   },
   {
     "memory_id": "mem_1789992906383",
@@ -3202,8 +3202,8 @@
         ]
       }
     },
-    "is_consolidated": false,
-    "consolidation_arc_id": null
+    "is_consolidated": true,
+    "consolidation_arc_id": "arc_learned_dash_dodge_為什_1790683133_0"
   },
   {
     "memory_id": "mem_1789993032418",
@@ -3241,8 +3241,8 @@
         ]
       }
     },
-    "is_consolidated": false,
-    "consolidation_arc_id": null
+    "is_consolidated": true,
+    "consolidation_arc_id": "arc_learned_dash_dodge_為什_1790683133_0"
   },
   {
     "memory_id": "mem_1789993150416",
@@ -3280,8 +3280,8 @@
         ]
       }
     },
-    "is_consolidated": false,
-    "consolidation_arc_id": null
+    "is_consolidated": true,
+    "consolidation_arc_id": "arc_learned_dash_dodge_為什_1790683133_0"
   },
   {
     "memory_id": "mem_1789993277431_1",
@@ -3324,8 +3324,8 @@
         ]
       }
     },
-    "is_consolidated": false,
-    "consolidation_arc_id": null
+    "is_consolidated": true,
+    "consolidation_arc_id": "arc_learned_dash_dodge_原神_1790683133_1"
   },
   {
     "memory_id": "mem_1789993290703_1",
@@ -3368,8 +3368,8 @@
         ]
       }
     },
-    "is_consolidated": false,
-    "consolidation_arc_id": null
+    "is_consolidated": true,
+    "consolidation_arc_id": "arc_learned_dash_dodge_原神_1790683133_1"
   },
   {
     "memory_id": "mem_1789993307512_1",
@@ -3412,8 +3412,8 @@
         ]
       }
     },
-    "is_consolidated": false,
-    "consolidation_arc_id": null
+    "is_consolidated": true,
+    "consolidation_arc_id": "arc_learned_dash_dodge_原神_1790683133_1"
   },
   {
     "memory_id": "mem_1789993323735_2",
@@ -3456,8 +3456,8 @@
         ]
       }
     },
-    "is_consolidated": false,
-    "consolidation_arc_id": null
+    "is_consolidated": true,
+    "consolidation_arc_id": "arc_learned_dash_dodge_原神_1790683133_1"
   },
   {
     "memory_id": "mem_1789993343276",
@@ -3484,6 +3484,201 @@
       "should_act": {
         "type": "noul",
         "instructions": "是否立即執行 dash_dodge？"
+      },
+      "urgency": {
+        "type": "score",
+        "instructions": "此動作之緊迫程度",
+        "criteria": [
+          "低",
+          "中",
+          "高"
+        ]
+      }
+    },
+    "is_consolidated": false,
+    "consolidation_arc_id": null
+  },
+  {
+    "memory_id": "mem_1790683146799",
+    "timestamp": 1790683146.7992158,
+    "game_type": "原神 (Genshin Impact)",
+    "user_demand": "完成這個遊戲",
+    "visual_context": "### 【色彩矩陣重構】自動化操作戰術指示 (Directive)\n\n---\n\n### 1. 核心目標\n完成 **LEVEL 5 色彩漸變拼圖**。  \n解題邏輯為：利用固定錨點（帶白點方塊：頂行、底",
+    "state_text": "需求: 完成這個遊戲",
+    "telemetry_features": {},
+    "novelty_level": "similar",
+    "thinking_effort": "medium",
+    "gemini_directive": "### 【色彩矩陣重構】自動化操作戰術指示 (Directive)\n\n---\n\n### 1. 核心目標\n完成 **LEVEL 5 色彩漸變拼圖**。  \n解題邏輯為：利用固定錨點（帶白點方塊：頂行、底行及中央第 3 列）作為色相基準，將左右兩側混淆的**「冷色調（青/藍）」**與**「暖色調（黃/橙/粉）」**方塊歸位並依漸變梯度排列。\n\n> **座標定義**：以拼圖左上角為 `(0, 0)`，右下角為 `(6, 4)`，格式為 `(行, 列)`。  \n> 帶白點者為鎖定格（不可移動）：第 0 行、第 6 行全列，以及第 2 列全行。\n\n---\n\n### 2. 推薦輸入序列 (交換操作步驟)\n\n#### **【階段一：冷暖色域跨區置換】**\n先將右側誤入的冷色方塊與左側誤入的暖色方塊進行跨區互換：\n1. **點擊 `(5, 3)` [亮藍]** $\\leftrightarrow$ **點擊 `(5, 0)` [明橙]**\n2. **點擊 `(3, 3)` [天藍]** $\\leftrightarrow$ **點擊 `(4, 1)` [鮮橙]**\n3. **點擊 `(1, 3)` [深靛藍]** $\\leftrightarrow$ **點擊 `(1, 0)` [駝褐色]**\n\n---\n\n#### **【階段二：左半區（青 $\\rightarrow$ 純藍漸變）校準】**\n*目標：由頂部青綠漸變至底部亮藍，外側（第 0 列）偏青藍，內側（第 1 列）偏灰藍/深藍。*\n1. **點擊 `(1, 0)` [原深靛藍]** $\\leftrightarrow$ **點擊 `(2, 0)` [中天藍]**（調整第 0 列頂部明度）\n2. **點擊 `(2, 0)`** $\\leftrightarrow$ **點擊 `(1, 1)` [淺天藍]**（使淺天藍接續頂部青綠）\n3. **點擊 `(4, 0)` [灰藍]** $\\leftrightarrow$ **點擊 `(3, 0)` [灰青]**\n4. **點擊 `(5, 0)` [亮藍]**（確保最底層銜接 `(6, 0)` 純深藍）\n5. **點擊 `(3, 1)` [深藍]** $\\leftrightarrow$ **點擊 `(5, 1)` [灰青藍]**（使第 1 列由上至下深藍漸變至紫底）\n\n---\n\n#### **【階段三：右半區（明黃 $\\rightarrow$ 珊瑚紅漸變）校準】**\n*目標：最右側（第 4 列）為「明黃 $\\rightarrow$ 橙黃 $\\rightarrow$ 橙紅 $\\rightarrow$ 珊瑚紅」；第 3 列為過渡的「黃綠 $\\rightarrow$ 灰紫肉色 $\\rightarrow$ 玫瑰粉」。*\n1. **點擊 `(1, 4)` [淺橙黃]** $\\leftrightarrow$ **點擊 `(3, 4)` [金黃]**（金黃色接在 `(0, 4)` 明黃正下方）\n2. **點擊 `(2, 4)` [橙紅]** $\\leftrightarrow$ **點擊 `(4, 4)` [豆沙粉]**\n3. **點擊 `(5, 4)` [土黃褐]** $\\leftrightarrow$ **點擊 `(1, 3)` [駝色]**\n4. **點擊 `(4, 3)` [灰黃]** $\\leftrightarrow$ **點擊 `(2, 3)` [肉粉]**（使第 3 列由黃綠順滑過渡至底部的粉紅）\n\n---\n\n### 3. 警戒與校驗條件\n- **錨點保護警戒**：嚴禁對帶有白點的核心錨點發送拖曳/點擊指令（系統會判定為無效輸入）。\n- **色階平滑度校驗**：\n  - 觀察每相鄰兩格的交界處，邊界應呈現**視覺融為一體無突兀色差**。\n  - 完成後拼圖將自動觸發過關白光動畫並結算。",
+    "primary_action": "idle",
+    "guidance_text": "### 2. 推薦輸入序列 (交換操作步驟)",
+    "suggested_questions": {
+      "tactical_action": {
+        "type": "choice",
+        "instructions": "評估針對場景的最佳動作",
+        "options": [
+          "idle",
+          "idle"
+        ]
+      },
+      "should_act": {
+        "type": "noul",
+        "instructions": "是否立即執行 idle？"
+      },
+      "urgency": {
+        "type": "score",
+        "instructions": "此動作之緊迫程度",
+        "criteria": [
+          "低",
+          "中",
+          "高"
+        ]
+      }
+    },
+    "is_consolidated": true,
+    "consolidation_arc_id": "arc_learned_idle_完成_1790683223_0"
+  },
+  {
+    "memory_id": "mem_1790683206017",
+    "timestamp": 1790683206.0176,
+    "game_type": "原神 (Genshin Impact)",
+    "user_demand": "完成這個遊戲",
+    "visual_context": "### 戰術指示：色彩矩陣解構與歸位重構 (Level 5)\n\n本關卡為 $7 \\times 5$ 的雙向色彩漸變拼圖。帶有**白色圓點**為固定錨點（第 1 行、第 7 行及第 3 列不可移動）。\n",
+    "state_text": "需求: 完成這個遊戲",
+    "telemetry_features": {},
+    "novelty_level": "similar",
+    "thinking_effort": "medium",
+    "gemini_directive": "### 戰術指示：色彩矩陣解構與歸位重構 (Level 5)\n\n本關卡為 $7 \\times 5$ 的雙向色彩漸變拼圖。帶有**白色圓點**為固定錨點（第 1 行、第 7 行及第 3 列不可移動）。\n- **左半部（第 1、2 列）**：由頂部青綠色過渡至底部的純藍色（冷色漸變區）。\n- **右半部（第 4、5 列）**：由頂部亮黃色過渡至底部的珊瑚粉紅（暖色漸變區）。\n\n---\n\n### 1. 核心目標\n透過滑鼠點擊交換（Swap），將所有誤置的冷色塊移回左側、暖色塊移回右側，完成雙向色階平衡。\n\n---\n\n### 2. 推薦輸入序列 (滑鼠點擊交換對)\n*座標定義：`(行, 列)`，由上至下為第 1~7 行，由左至右為第 1~5 列。*\n\n1. **冷暖色區塊大換位（歸位冷色至左、暖色至右）：**\n   - 點擊 `(6, 1)` [暖橘色] $\\leftrightarrow$ 點擊 `(6, 4)` [寶藍色]\n   - 點擊 `(5, 2)` [亮橙色] $\\leftrightarrow$ 點擊 `(4, 4)` [明亮天藍]\n   - 點擊 `(2, 1)` [土褐色] $\\leftrightarrow$ 點擊 `(2, 4)` [深靛藍]\n\n2. **右側暖色與過渡調和：**\n   - 點擊 `(5, 4)` [黃灰泥色] $\\leftrightarrow$ 點擊 `(3, 5)` [珊瑚橙色]\n   - 點擊 `(6, 5)` [沙褐色] $\\leftrightarrow$ 點擊 `(4, 5)` [淡橙黃色]\n   - 點擊 `(5, 5)` [粉紫褐] $\\leftrightarrow$ 點擊 `(2, 5)` [暖黃色] 視漸變微調至第 5 列平滑（黃 $\\to$ 橙黃 $\\to$ 橙 $\\to$ 珊瑚粉）。\n\n3. **左側冷色縱向階梯對齊：**\n   - 點擊 `(4, 2)` [鮮豔深藍] $\\leftrightarrow$ 點擊 `(6, 2)` [灰淺藍]\n   - 點擊 `(3, 1)` [中天藍] $\\leftrightarrow$ 點擊 `(4, 1)` [灰綠藍]（使青綠往深藍自然平滑）\n   - 點擊 `(2, 2)` $\\leftrightarrow$ 點擊 `(3, 2)` 完成青藍過渡。\n\n---\n\n### 3. 警戒條件\n1. **錨點保護鎖**：嚴禁對帶有白點的位置（`Row 1`、`Row 7`、`Column 3`）發送點擊，此類方塊具有不可移動屬性，會導致操作無效中斷。\n2. **終態檢驗信號**：當最後一組色塊交換完畢後，畫面會觸發全螢幕彩光波紋特效，此時致動器應立即暫停點擊，等待過關結算動畫。",
+    "primary_action": "idle",
+    "guidance_text": "### 2. 推薦輸入序列 (滑鼠點擊交換對)",
+    "suggested_questions": {
+      "tactical_action": {
+        "type": "choice",
+        "instructions": "評估針對場景的最佳動作",
+        "options": [
+          "idle",
+          "idle"
+        ]
+      },
+      "should_act": {
+        "type": "noul",
+        "instructions": "是否立即執行 idle？"
+      },
+      "urgency": {
+        "type": "score",
+        "instructions": "此動作之緊迫程度",
+        "criteria": [
+          "低",
+          "中",
+          "高"
+        ]
+      }
+    },
+    "is_consolidated": true,
+    "consolidation_arc_id": "arc_learned_idle_完成_1790683223_0"
+  },
+  {
+    "memory_id": "mem_1790683234749",
+    "timestamp": 1790683234.7495284,
+    "game_type": "原神 (Genshin Impact)",
+    "user_demand": "完成當前方面這個遊戲",
+    "visual_context": "### 1. 核心目標\n接管螢幕解謎：完成 **Level 5 色彩漸變拼圖**。  \n解謎邏輯為雙向漸變——左側（第 1、2 列）為**冷色調（青綠 $\\rightarrow$ 深藍）**；右側（第",
+    "state_text": "需求: 完成當前方面這個遊戲",
+    "telemetry_features": {},
+    "novelty_level": "similar",
+    "thinking_effort": "medium",
+    "gemini_directive": "### 1. 核心目標\n接管螢幕解謎：完成 **Level 5 色彩漸變拼圖**。  \n解謎邏輯為雙向漸變——左側（第 1、2 列）為**冷色調（青綠 $\\rightarrow$ 深藍）**；右側（第 4、5 列）為**暖色調（金黃 $\\rightarrow$ 橙紅）**；中央第 3 列與上下邊界為固定基準錨點。\n\n---\n\n### 2. 推薦輸入序列（兩兩點擊互換）\n座標定義：**[行, 列]**（由上至下 1~7 行，由左至右 1~5 列）。\n\n#### 第一階段：冷暖色歸位（左右大跨區互換）\n1. **點擊 [4, 4]**（天藍） $\\leftrightarrow$ **點擊 [2, 1]**（棕土）\n2. **點擊 [6, 4]**（寶藍） $\\leftrightarrow$ **點擊 [6, 1]**（亮橙）\n3. **點擊 [2, 4]**（深紫藍） $\\leftrightarrow$ **點擊 [5, 2]**（杏橙）\n\n---\n\n#### 第二階段：右側暖色微調（第 4、5 列）\n4. **點擊 [2, 4]**（當前為杏橙） $\\leftrightarrow$ **點擊 [5, 4]**（土黃）\n5. **點擊 [4, 4]**（當前為棕土） $\\leftrightarrow$ **點擊 [3, 4]**（磚粉）\n6. **點擊 [3, 4]**（當前為棕土） $\\leftrightarrow$ **點擊 [6, 5]**（卡其黃）\n7. **點擊 [4, 5]**（亮黃） $\\leftrightarrow$ **點擊 [2, 5]**（橙黃）\n8. **點擊 [6, 4]**（當前為亮橙） $\\leftrightarrow$ **點擊 [4, 5]**（當前為橙黃）\n9. **點擊 [4, 5]**（當前為亮橙） $\\leftrightarrow$ **點擊 [3, 5]**（橘紅）\n10. **點擊 [6, 4]**（當前為橘紅） $\\leftrightarrow$ **點擊 [5, 5]**（豆沙粉）\n11. **點擊 [6, 4]**（當前為豆沙粉） $\\leftrightarrow$ **點擊 [6, 5]**（橘紅）\n\n---\n\n#### 第三階段：左側冷色微調（第 1、2 列）\n12. **點擊 [2, 2]**（天藍） $\\leftrightarrow$ **點擊 [4, 1]**（灰綠）\n13. **點擊 [3, 1]**（中藍） $\\leftrightarrow$ **點擊 [4, 1]**（當前為天藍）\n14. **點擊 [4, 2]**（亮藍） $\\leftrightarrow$ **點擊 [5, 1]**（灰藍）\n15. **點擊 [6, 1]**（寶藍） $\\leftrightarrow$ **點擊 [4, 1]**（當前為亮藍）\n16. **點擊 [3, 2]**（灰紫藍） $\\leftrightarrow$ **點擊 [6, 2]**（灰藍）\n17. **點擊 [5, 2]**（深紫藍） $\\leftrightarrow$ **點擊 [6, 2]**（當前為灰紫藍）\n\n---\n\n### 3. 警戒條件\n- **不可移動標記**：凡帶有白色方塊標記之格點（第 1 行、第 7 行、第 3 整列）皆為鎖定塊，點擊無效，切勿將其設為交換目標。\n- **過渡連續性驗證**：全部交換完成後，左側由青綠自然滑向深靛藍，右側由鵝黃自然過渡至洋紅玫瑰色，系統將自動觸發通關特效。",
+    "primary_action": "solve_puzzle",
+    "guidance_text": "### 2. 推薦輸入序列（兩兩點擊互換）",
+    "suggested_questions": {
+      "tactical_action": {
+        "type": "choice",
+        "instructions": "評估針對場景的最佳動作",
+        "options": [
+          "solve_puzzle",
+          "idle"
+        ]
+      },
+      "should_act": {
+        "type": "noul",
+        "instructions": "是否立即執行 solve_puzzle？"
+      },
+      "urgency": {
+        "type": "score",
+        "instructions": "此動作之緊迫程度",
+        "criteria": [
+          "低",
+          "中",
+          "高"
+        ]
+      }
+    },
+    "is_consolidated": false,
+    "consolidation_arc_id": null
+  },
+  {
+    "memory_id": "mem_1791205349256",
+    "timestamp": 1791205349.2563825,
+    "game_type": "原神 (Genshin Impact)",
+    "user_demand": "建立腳本",
+    "visual_context": "【Guidance HUD 戰術指令載入完成】  \n【系統狀態】：大腦認知核心 (Gemini 3.8 Flash) 已鎖定畫面採礦陣列。`OrganSynthesizer` 正式生長自律挖掘宏手 `",
+    "state_text": "需求: 建立腳本",
+    "telemetry_features": {},
+    "novelty_level": "novel",
+    "thinking_effort": "max",
+    "gemini_directive": "【Guidance HUD 戰術指令載入完成】  \n【系統狀態】：大腦認知核心 (Gemini 3.8 Flash) 已鎖定畫面採礦陣列。`OrganSynthesizer` 正式生長自律挖掘宏手 `DynamicActionScriptHand`，接管網格採集與資金自動化推進。\n\n---\n\n### 1. 核心目標\n* **自動化陣列破壞與資金狂刷**：全自動掃描並擊碎礦坑方塊（HP 5~10），利用單擊 2 點傷害特性快速清空網格，推進挖掘深度並最大化資金（¥）獲取速率。\n* **殘血優先清剿**：優先鎖定 HP 殘留最低（如 5~7 數值）之方塊，以最少點擊次數換取單塊 ¥1 獎勵。\n\n---\n\n### 2. 推薦輸入序列 (Script 宏手致動規格)\n\n本腳本將控制游標在中央採礦網格（約螢幕比例 `X: 0.35 ~ 0.88`, `Y: 0.12 ~ 0.92`）內以蛇形（S-Type）軌跡進行高頻致動打擊：\n\n```text\n[Loop Start: 網格自動挖掘循環]\n  1. 游標移動至當前目標方塊坐標 (Target_Block_Pos)\n  2. 滑鼠左鍵 (LMB) -> 按下 (Down) -> 延遲 40ms -> 放開 (Up)\n  3. 延遲 40ms\n  4. 判定方塊血量是否歸零：\n     - 若未歸零：重複 2~3 步驟 (約 3~5 次點擊擊破單一方塊)\n     - 若已擊破：游標偏移至鄰近方塊 (+ΔX 或 +ΔY)\n  5. 巡航路徑：由上至下、由左至右逐行掃描（略過已完全清空的坑洞區域）\n[Loop End]\n```\n\n#### 即時調度快捷 Python 驅動邏輯（供致動器直讀）：\n```python\nimport pyautogui\nimport time\n\n# 網格區域正規化範圍 (採礦池)\nGRID_X_START, GRID_Y_START = 650, 130\nGRID_X_END, GRID_Y_END = 1700, 990\nSTEP_X = (GRID_X_END - GRID_X_START) // 18\nSTEP_Y = (GRID_Y_END - GRID_Y_START) // 16\n\ndef run_auto_mining():\n    pyautogui.PAUSE = 0.02\n    for y in range(GRID_Y_START, GRID_Y_END, STEP_Y):\n        for x in range(GRID_X_START, GRID_X_END, STEP_X):\n            pyautogui.moveTo(x, y)\n            # 單個方塊平均血量 10，每次傷害 2 -> 連點 5 次\n            for _ in range(5):\n                pyautogui.click()\n                time.sleep(0.04)\n```\n\n---\n\n### 3. 警戒條件\n* **防誤觸停止中斷**：**嚴格禁用按鍵 `X`**，且游標移動安全邊界需排除左下角板夾區域（`X: 0.0 ~ 0.32`），防止誤點擊「停止挖掘」按鈕導致進度結算。\n* **延遲與丟包警報**：當前延遲為 36ms，若檢測到右上角 Ping 值躍升 > 150ms，自動將點擊間隔延長至 80ms，避免指令堆疊穿透。\n* **換層/結算中斷攔截**：若偵測到全屏網格重置或深度數值刷新（>0米），暫停 LMB 循環 500ms，待新方塊加載完成後重新校準坐標。",
+    "primary_action": "open_chest",
+    "guidance_text": "### 2. 推薦輸入序列 (Script 宏手致動規格)",
+    "suggested_questions": {
+      "tactical_action": {
+        "type": "choice",
+        "instructions": "評估針對場景的最佳動作",
+        "options": [
+          "open_chest",
+          "idle"
+        ]
+      },
+      "should_act": {
+        "type": "noul",
+        "instructions": "是否立即執行 open_chest？"
+      },
+      "urgency": {
+        "type": "score",
+        "instructions": "此動作之緊迫程度",
+        "criteria": [
+          "低",
+          "中",
+          "高"
+        ]
+      }
+    },
+    "is_consolidated": false,
+    "consolidation_arc_id": null
+  },
+  {
+    "memory_id": "mem_1791205437156",
+    "timestamp": 1791205437.1560614,
+    "game_type": "原神 (Genshin Impact)",
+    "user_demand": "依照你剛剛的規劃開始操作",
+    "visual_context": "神經鏈路已鎖定，認知核心已接管！正在為『自律器官生長器 (OrganSynthesizer)』與『鍵鼠實體致動器 (ScreenActuator)』生成即時執行宏手 Script 指令。\n\n---\n\n",
+    "state_text": "需求: 依照你剛剛的規劃開始操作",
+    "telemetry_features": {},
+    "novelty_level": "novel",
+    "thinking_effort": "max",
+    "gemini_directive": "神經鏈路已鎖定，認知核心已接管！正在為『自律器官生長器 (OrganSynthesizer)』與『鍵鼠實體致動器 (ScreenActuator)』生成即時執行宏手 Script 指令。\n\n---\n\n### 【天然產出與資產勘探 - 自動化快速掘進戰術】\n\n#### 1. 核心目標\n**接管高速碎塊作業**。當前點擊傷害為 **2**，DPS 為 **1**。優先鎖定地圖中**殘餘耐久度最低（5、6、7 點）**的方塊進行集火破壞，以最小點擊成本迅速換取資金（每個方塊 ¥1），加速資本滾雪球以解鎖後續 DPS/單擊加成。\n\n---\n\n#### 2. 推薦輸入序列 (ScreenActuator 執行隊列)\n\n*   **動作一：秒殺最低耐久核心點（耐久 5 方塊）**\n    *   **滑鼠移動**至坐標 `(X: 702, Y: 680)`（右側挖掘通道旁數值為「5」之方塊）\n    *   **滑鼠左鍵**連點 3 次（`Left Click * 3`，間隔 120ms）\n    *   *預期結算：耐久歸零破裂，資金 +¥1（累計 ¥11）。*\n\n*   **動作二：橫向開道（耐久 6 方塊）**\n    *   **滑鼠移動**至坐標 `(X: 475, Y: 505)`（中偏左側數值為「6」之方塊）\n    *   **滑鼠左鍵**連點 3 次（`Left Click * 3`，間隔 120ms）\n    *   *預期結算：耐久歸零破裂，資金 +¥1（累計 ¥12）。*\n\n*   **動作三：連續清理低血邊緣（耐久 7 方塊組）**\n    *   **滑鼠移動**至坐標 `(X: 450, Y: 458)`（數值為「7」之方塊）-> **滑鼠左鍵**連點 4 次\n    *   **滑鼠移動**至坐標 `(X: 500, Y: 550)`（數值為「7」之方塊）-> **滑鼠左鍵**連點 4 次\n    *   **滑鼠移動**至坐標 `(X: 575, Y: 815)`（數值為「7」之方塊）-> **滑鼠左鍵**連點 4 次\n\n*   **動作四：自動步進循環**\n    *   按優先級隊列掃描全屏耐久為 **8** 的方塊，維持每秒 3~4 次的高頻左鍵節奏。\n\n---\n\n#### 3. 警戒條件與狀態中斷\n\n1.  **禁區避讓**：\n    *   嚴禁滑鼠左鍵點擊左側控制面板的 **`[停止挖掘]`** 區域 `(X: 130~200, Y: 670~720)`，避免中斷挖掘作業。\n2.  **空揮中斷檢測**：\n    *   實體致動器每擊破一塊方塊（檢測到底層灰色岩石背景露出）必須立即位移至次低耐久目標，禁止在已擊穿空洞區域重複點擊浪費點擊頻率。\n3.  **資金升級警戒**：\n    *   當資金達到商店解鎖/升級閾值時（或左側欄位出現可購買升級提示），立即暫停連點，調用宏手切換至升級面板強化「傷害/點擊」與「DPS」。",
+    "primary_action": "switch_2",
+    "guidance_text": "#### 2. 推薦輸入序列 (ScreenActuator 執行隊列)",
+    "suggested_questions": {
+      "tactical_action": {
+        "type": "choice",
+        "instructions": "評估針對場景的最佳動作",
+        "options": [
+          "switch_2",
+          "idle"
+        ]
+      },
+      "should_act": {
+        "type": "noul",
+        "instructions": "是否立即執行 switch_2？"
       },
       "urgency": {
         "type": "score",

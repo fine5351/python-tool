@@ -1,1 +1,194 @@
-[]
+[
+  {
+    "arc_id": "arc_learned_dash_dodge_為什_1790683133_0",
+    "name": "固化反射弧：原神 (Genshin Impact) - dash_dodge (為什)",
+    "game_type": "原神 (Genshin Impact)",
+    "trigger_keywords": [
+      "為什",
+      "什麼",
+      "麼你",
+      "你不",
+      "不會",
+      "會長",
+      "長出",
+      "出手"
+    ],
+    "trigger_predicates": {},
+    "questions": {
+      "tactical_action": {
+        "type": "choice",
+        "instructions": "針對【原神 (Genshin Impact)】當前場景，評估最佳決策動作",
+        "criteria": {
+          "dash_dodge": null,
+          "idle": null
+        },
+        "options": [
+          "dash_dodge",
+          "idle"
+        ]
+      },
+      "should_act": {
+        "type": "noul",
+        "instructions": "當前情境是否應當立即執行【dash_dodge】？"
+      },
+      "urgency": {
+        "type": "score",
+        "instructions": "此決策之緊迫程度評估",
+        "criteria": [
+          "低",
+          "中",
+          "高"
+        ]
+      }
+    },
+    "decision_mapping": {
+      "dash_dodge": "#### 2. 推薦技能序列與優先級"
+    },
+    "deterministic_output": {
+      "primary_action": "dash_dodge",
+      "confidence": 0.95,
+      "urgency": 0.85,
+      "should_evade": true,
+      "guidance_text": "#### 2. 推薦技能序列與優先級"
+    },
+    "confidence_threshold": 0.7,
+    "source_memory_ids": [
+      "mem_1789992326726",
+      "mem_1789992906383",
+      "mem_1789993032418",
+      "mem_1789993150416"
+    ],
+    "hit_count": 0,
+    "last_fired_at": 0.0,
+    "created_at": 1790683133.1564832
+  },
+  {
+    "arc_id": "arc_learned_dash_dodge_原神_1790683133_1",
+    "name": "固化反射弧：原神 (Genshin Impact) - dash_dodge (原神)",
+    "game_type": "原神 (Genshin Impact)",
+    "trigger_keywords": [
+      "原神",
+      "蒸發",
+      "作指",
+      "指導",
+      "操作指",
+      "作指導",
+      "操作指導",
+      "00",
+      "1",
+      "80"
+    ],
+    "trigger_predicates": {
+      "danger_detected": false,
+      "energy_ready": false,
+      "in_combat": true,
+      "has_interactive_target": false
+    },
+    "questions": {
+      "tactical_action": {
+        "type": "choice",
+        "instructions": "針對【原神 (Genshin Impact)】當前場景，評估最佳決策動作",
+        "criteria": {
+          "dash_dodge": null,
+          "idle": null
+        },
+        "options": [
+          "dash_dodge",
+          "idle"
+        ]
+      },
+      "should_act": {
+        "type": "noul",
+        "instructions": "當前情境是否應當立即執行【dash_dodge】？"
+      },
+      "urgency": {
+        "type": "score",
+        "instructions": "此決策之緊迫程度評估",
+        "criteria": [
+          "低",
+          "中",
+          "高"
+        ]
+      }
+    },
+    "decision_mapping": {
+      "dash_dodge": "#### 2. 推薦輸入序列 (DynamicActionScript 執行映射)"
+    },
+    "deterministic_output": {
+      "primary_action": "dash_dodge",
+      "confidence": 0.95,
+      "urgency": 0.85,
+      "should_evade": true,
+      "guidance_text": "#### 2. 推薦輸入序列 (DynamicActionScript 執行映射)"
+    },
+    "confidence_threshold": 0.7,
+    "source_memory_ids": [
+      "mem_1789993277431_1",
+      "mem_1789993290703_1",
+      "mem_1789993307512_1",
+      "mem_1789993323735_2"
+    ],
+    "hit_count": 2,
+    "last_fired_at": 1790683206.6265948,
+    "created_at": 1790683133.1630445
+  },
+  {
+    "arc_id": "arc_learned_idle_完成_1790683223_0",
+    "name": "固化反射弧：原神 (Genshin Impact) - idle (完成)",
+    "game_type": "原神 (Genshin Impact)",
+    "trigger_keywords": [
+      "完成",
+      "成這",
+      "個遊",
+      "遊戲",
+      "完成這",
+      "成這個",
+      "這個遊",
+      "個遊戲"
+    ],
+    "trigger_predicates": {},
+    "questions": {
+      "tactical_action": {
+        "type": "choice",
+        "instructions": "針對【原神 (Genshin Impact)】當前場景，評估最佳決策動作",
+        "criteria": {
+          "idle": null
+        },
+        "options": [
+          "idle"
+        ]
+      },
+      "should_act": {
+        "type": "noul",
+        "instructions": "當前情境是否應當立即執行【idle】？"
+      },
+      "urgency": {
+        "type": "score",
+        "instructions": "此決策之緊迫程度評估",
+        "criteria": [
+          "低",
+          "中",
+          "高"
+        ]
+      }
+    },
+    "decision_mapping": {
+      "idle": "### 2. 推薦輸入序列 (交換操作步驟)"
+    },
+    "deterministic_output": {
+      "primary_action": "idle",
+      "confidence": 0.95,
+      "urgency": 0.85,
+      "should_evade": false,
+      "guidance_text": "### 2. 推薦輸入序列 (交換操作步驟)"
+    },
+    "confidence_threshold": 0.7,
+    "source_memory_ids": [
+      "mem_1790683146799",
+      "mem_1790683206017"
+    ],
+    "hit_count": 0,
+    "last_fired_at": 0.0,
+    "created_at": 1790683223.1692111
+  }
+]

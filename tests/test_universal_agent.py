@@ -15,7 +15,7 @@ from PIL import Image
 import game_assistant
 from game_assistant.core.config import (
     GameType, AssistCapability, AnalysisMode, MODEL_NAME, DEFAULT_POLL_INTERVAL,
-    HOTKEY_EMERGENCY_STOP, HOTKEY_TOGGLE_POLL
+    HOTKEY_EMERGENCY_STOP, HOTKEY_TOGGLE_POLL, ThinkingEffortLevel
 )
 from game_assistant.engines.jev_engine import (
     Choice, Noul, Score, JevDecisionEngine, JevResponse,
@@ -1034,6 +1034,75 @@ class TestMultiScenarioExpansion(unittest.TestCase):
         # 驗證掛載與 Predicates 收集
         preds = agent.organ_registry.collect_all_predicates()
         self.assertIsInstance(preds, dict)
+
+
+class TestGemini38FlashMigration(unittest.TestCase):
+    """測試 Gemini 3.8 Flash 模型遷移、Thinking Level 配置與結構化輸出"""
+
+    def setUp(self):
+        self.engine = GeminiAuxiliaryEngine(api_key="")
+        self.dummy_img = Image.new("RGB", (100, 100), color="yellow")
+
+    def test_model_name_constant(self):
+        self.assertEqual(MODEL_NAME, "gemini-3.8-flash")
+        self.assertEqual(self.engine.model_name, "gemini-3.8-flash")
+
+    def test_thinking_effort_levels(self):
+        self.assertEqual(ThinkingEffortLevel.MINIMAL.value, "minimal")
+        self.assertEqual(ThinkingEffortLevel.LOW.value, "low")
+        self.assertEqual(ThinkingEffortLevel.MEDIUM.value, "medium")
+        self.assertEqual(ThinkingEffortLevel.MAX.value, "max")
+        self.assertEqual(ThinkingEffortLevel.HIGH.value, "high")
+
+    def test_build_generate_config_levels(self):
+        cfg_med = self.engine._build_generate_config(thinking_effort="medium")
+        if cfg_med is not None:
+            self.assertTrue(hasattr(cfg_med, "thinking_config"))
+
+        cfg_high = self.engine._build_generate_config(thinking_effort="high")
+        if cfg_high is not None:
+            self.assertTrue(hasattr(cfg_high, "thinking_config"))
+
+        cfg_json = self.engine._build_generate_config(
+            thinking_effort="minimal",
+            response_mime_type="application/json"
+        )
+        if cfg_json is not None:
+            self.assertEqual(getattr(cfg_json, "response_mime_type", None), "application/json")
+
+    def test_gemini_calls_pass_config_properly(self):
+        from unittest.mock import MagicMock
+        mock_client = MagicMock()
+        mock_resp = MagicMock()
+        mock_resp.text = "```python\nclass CustomTool:\n    pass\n```"
+        mock_client.models.generate_content.return_value = mock_resp
+
+        self.engine.client = mock_client
+        self.engine.active_provider = "gemini_api"
+
+        # 1. synthesize_tool_code
+        code = self.engine.synthesize_tool_code("自訂工具需求")
+        self.assertIn("class CustomTool", code)
+        self.assertTrue(mock_client.models.generate_content.called)
+        last_kwargs = mock_client.models.generate_content.call_args.kwargs
+        self.assertEqual(last_kwargs["model"], "gemini-3.8-flash")
+        self.assertIn("config", last_kwargs)
+
+        # 2. decompose_user_demand
+        mock_resp.text = "戰術指示：接管輸出"
+        res = self.engine.decompose_user_demand("幫我接管操作", GameType.GENSHIN, AssistCapability.GUIDANCE)
+        self.assertIn("接管輸出", res)
+        last_kwargs = mock_client.models.generate_content.call_args.kwargs
+        self.assertEqual(last_kwargs["model"], "gemini-3.8-flash")
+        self.assertIn("config", last_kwargs)
+
+        # 3. translate_voice_text
+        mock_resp.text = "Help!"
+        trans = self.engine.translate_voice_text("救我", target_lang="英文")
+        self.assertEqual(trans, "Help!")
+        last_kwargs = mock_client.models.generate_content.call_args.kwargs
+        self.assertEqual(last_kwargs["model"], "gemini-3.8-flash")
+        self.assertIn("config", last_kwargs)
 
 
 if __name__ == "__main__":

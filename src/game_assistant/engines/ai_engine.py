@@ -92,6 +92,53 @@ class GeminiAuxiliaryEngine:
         self.api_key = api_key
         self._init_providers()
 
+    def _build_generate_config(
+        self,
+        thinking_effort: str = "medium",
+        response_mime_type: Optional[str] = None,
+        system_instruction: Optional[str] = None,
+        temperature: Optional[float] = None
+    ) -> Optional[Any]:
+        """
+        為 Gemini 3.8 Flash 建構 GenerateContentConfig
+        原生支援 Gemini 3.x 之語意化 thinking_level (MINIMAL / LOW / MEDIUM / HIGH)
+        與結構化輸出 response_mime_type
+        """
+        config_kwargs: Dict[str, Any] = {}
+
+        if response_mime_type:
+            config_kwargs["response_mime_type"] = response_mime_type
+        if system_instruction:
+            config_kwargs["system_instruction"] = system_instruction
+        if temperature is not None:
+            config_kwargs["temperature"] = temperature
+
+        effort_str = str(thinking_effort).lower()
+        if hasattr(types, "ThinkingConfig"):
+            try:
+                if hasattr(types, "ThinkingLevel"):
+                    if effort_str in ("minimal", "off", "none", "zero"):
+                        t_level = getattr(types.ThinkingLevel, "MINIMAL", types.ThinkingLevel.LOW)
+                    elif effort_str in ("low", "fast"):
+                        t_level = types.ThinkingLevel.LOW
+                    elif effort_str in ("max", "high", "deep"):
+                        t_level = types.ThinkingLevel.HIGH
+                    else:
+                        t_level = types.ThinkingLevel.MEDIUM
+                    config_kwargs["thinking_config"] = types.ThinkingConfig(thinking_level=t_level)
+                else:
+                    t_val = "high" if effort_str in ("max", "high", "deep") else ("minimal" if effort_str in ("minimal", "off", "zero") else "medium")
+                    config_kwargs["thinking_config"] = types.ThinkingConfig(thinking_level=t_val)
+            except Exception:
+                pass
+
+        if config_kwargs and hasattr(types, "GenerateContentConfig"):
+            try:
+                return types.GenerateContentConfig(**config_kwargs)
+            except Exception:
+                return None
+        return None
+
 
     def decompose_user_demand(
         self,
@@ -153,17 +200,8 @@ class GeminiAuxiliaryEngine:
         try:
             contents = [image, prompt] if image else [prompt]
 
-            # 依據思考深度動態配置 ThinkingConfig (medium vs max)
-            gen_config = None
-            if hasattr(types, "ThinkingConfig") and hasattr(types, "ThinkingLevel"):
-                try:
-                    t_level = types.ThinkingLevel.HIGH if thinking_effort == "max" else types.ThinkingLevel.MEDIUM
-                    gen_config = types.GenerateContentConfig(
-                        thinking_config=types.ThinkingConfig(thinking_level=t_level)
-                    )
-                except Exception:
-                    gen_config = None
-
+            # 依據思考深度動態配置 Gemini 3.8 Flash ThinkingConfig (medium vs high)
+            gen_config = self._build_generate_config(thinking_effort=thinking_effort)
             call_kwargs = {"model": self.model_name, "contents": contents}
             if gen_config is not None:
                 call_kwargs["config"] = gen_config
@@ -413,16 +451,8 @@ class GeminiAuxiliaryEngine:
             )
 
         try:
-            gen_config = None
-            if hasattr(types, "ThinkingConfig") and hasattr(types, "ThinkingLevel"):
-                try:
-                    t_level = types.ThinkingLevel.HIGH if thinking_effort == "max" else types.ThinkingLevel.MEDIUM
-                    gen_config = types.GenerateContentConfig(
-                        thinking_config=types.ThinkingConfig(thinking_level=t_level)
-                    )
-                except Exception:
-                    gen_config = None
-
+            # 依據思考深度動態配置 Gemini 3.8 Flash ThinkingConfig (medium vs high)
+            gen_config = self._build_generate_config(thinking_effort=thinking_effort)
             call_kwargs = {"model": self.model_name, "contents": [image, final_prompt]}
             if gen_config is not None:
                 call_kwargs["config"] = gen_config
@@ -489,10 +519,12 @@ class GeminiAuxiliaryEngine:
         )
 
         try:
-            response = self.client.models.generate_content(
-                model=self.model_name,
-                contents=[image, prompt]
-            )
+            gen_config = self._build_generate_config(thinking_effort="low")
+            call_kwargs = {"model": self.model_name, "contents": [image, prompt]}
+            if gen_config is not None:
+                call_kwargs["config"] = gen_config
+
+            response = self.client.models.generate_content(**call_kwargs)
             if response and response.text:
                 return response.text.strip()
             return "⚠️ Gemini 畫面翻譯未返回內容。"
@@ -534,10 +566,12 @@ class GeminiAuxiliaryEngine:
         )
 
         try:
-            response = self.client.models.generate_content(
-                model=self.model_name,
-                contents=[image, prompt]
-            )
+            gen_config = self._build_generate_config(thinking_effort="minimal")
+            call_kwargs = {"model": self.model_name, "contents": [image, prompt]}
+            if gen_config is not None:
+                call_kwargs["config"] = gen_config
+
+            response = self.client.models.generate_content(**call_kwargs)
             text = response.text.strip() if response and response.text else ""
             if not text:
                 return self._fallback_chat_subtitles(target_lang)
@@ -579,10 +613,15 @@ class GeminiAuxiliaryEngine:
         )
 
         try:
-            response = self.client.models.generate_content(
-                model=self.model_name,
-                contents=[prompt]
+            gen_config = self._build_generate_config(
+                thinking_effort="minimal",
+                temperature=0.1
             )
+            call_kwargs = {"model": self.model_name, "contents": [prompt]}
+            if gen_config is not None:
+                call_kwargs["config"] = gen_config
+
+            response = self.client.models.generate_content(**call_kwargs)
             if response and response.text:
                 clean_text = response.text.strip().strip('"\'`')
                 return clean_text
@@ -922,7 +961,14 @@ class GeminiAuxiliaryEngine:
                     "請為遊戲助理自主生長一個合規的 Python 工具模組代碼。\n"
                     "只輸出純 Python 代碼區塊 (使用 ```python ... ``` 包裹)。"
                 )
-                resp = self.client.models.generate_content(model=self.model_name, contents=[prompt])
+                gen_config = self._build_generate_config(
+                    thinking_effort="high",
+                    temperature=0.2
+                )
+                call_kwargs = {"model": self.model_name, "contents": [prompt]}
+                if gen_config is not None:
+                    call_kwargs["config"] = gen_config
+                resp = self.client.models.generate_content(**call_kwargs)
                 if resp and resp.text:
                     return resp.text.strip()
             except Exception:

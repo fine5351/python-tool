@@ -92,4 +92,18 @@
 - [x] 任務 50: 撰寫完整單元測試套件 (`tests/test_translation.py`)：覆蓋常數列舉、Gemini 視覺翻譯/離線降級/JSON 抽取、致動器剪貼簿貼上、Agent 協調、UI 浮動字幕/Overlay、非同步 Worker、Win32 64-bit ctypes 降級、防焦點奪取旗標等 36 項測試，確保現有 44 項原有測試持續 100% 通過（總計 80 項測試全數 PASS）
 - [x] 任務 51: 全專案語法編譯檢查 (`py_compile`) 28 個模組 100% 零錯誤
 
+## 第九階段：Gemini 3.8 Flash 模型遷移與思考架構升級 (Gemini 3.8 Flash Migration)
+- [x] 任務 52: 檢閱 Gemini 3.8 Flash API 規格與 `google-genai` SDK 遷移規範 (語意化 `thinking_level` 取代 legacy `thinking_budget`、結構化 JSON 輸出、64K output 與 1M context)
+- [x] 任務 53: 擴充系統組態與神經系統思考列舉 (`config.py`, `nervous_system.py`)：新增 `ThinkingEffortLevel.MINIMAL`、`LOW`、`HIGH`，精準映射 Gemini 3.8 Flash 的思考深度
+- [x] 任務 54: 升級 `GeminiAuxiliaryEngine` (`ai_engine.py`)：實作 `_build_generate_config`，全面接入 Gemini 3.8 Flash 的 `thinking_level`、`response_mime_type="application/json"` 與溫度控制
+- [x] 任務 55: 針對全系統 6 大 Gemini API 調用點深度優化：
+  - `decompose_user_demand`: 支援 medium / high 深度戰術拆解
+  - `analyze_screen`: 支援 medium / high 深度多模態畫面分析
+  - `translate_screen`: 配置 low 思考深度，兼顧翻譯品質與響應速度
+  - `translate_chat_subtitles`: 配置 minimal 思考深度與原生 JSON 輸出，加速字幕浮動顯示
+  - `translate_voice_text`: 配置 minimal 思考深度與 0.1 低溫，實現確定性遊戲短語極速翻譯
+  - `synthesize_tool_code`: 配置 high 思考深度，發揮 Gemini 3.8 Flash 頂尖代碼推理與安全審查能力
+- [x] 任務 56: 擴充單元測試套件 (`tests/test_universal_agent.py`, `tests/test_translation.py`)：新增 `TestGemini38FlashMigration` 涵蓋常數、思考深度列舉、Config 建置與 Mock 調用檢驗
+- [x] 任務 57: 更新專案說明文檔 (`README.md`, `AGENTS.md`)，詳述 Gemini 3.8 Flash 遷移成果與技術優勢
+
 

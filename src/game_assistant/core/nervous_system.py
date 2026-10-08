@@ -32,9 +32,12 @@ class NoveltyLevel(str, Enum):
 
 
 class ThinkingEffort(str, Enum):
-    """Gemini 大腦思考深度 (Thinking Effort)"""
-    MEDIUM = "medium"  # 快速思考 (針對簡單相似問題)
-    MAX = "max"        # 深度慢思考 (針對未曾遇過的新問題，Deep Thinking)
+    """Gemini 3.8 Flash 大腦思考深度 (Thinking Effort / Level)"""
+    MINIMAL = "minimal"  # 極速思考 (無思考延遲)
+    LOW = "low"          # 快速輕量思考
+    MEDIUM = "medium"    # 快速思考 (針對簡單相似問題)
+    MAX = "max"          # 深度慢思考 (針對未曾遇過的新問題，Deep Thinking)
+    HIGH = "high"        # MAX 相容別名
 
 
 def normalize_game_type(g: Any) -> str:
