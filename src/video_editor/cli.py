@@ -4,7 +4,7 @@ import argparse
 import sys
 from pathlib import Path
 
-from video_editor.config import EditorConfig
+from video_editor.config import EditorConfig, clean_path
 from video_editor.pipeline import VideoEditorPipeline
 
 
@@ -17,14 +17,14 @@ def parse_args(args=None) -> argparse.Namespace:
     parser.add_argument(
         "-i",
         "--input",
-        type=Path,
+        type=clean_path,
         required=True,
         help="輸入的長影片檔案路徑 (例如: input.mp4)",
     )
     parser.add_argument(
         "-o",
         "--output",
-        type=Path,
+        type=clean_path,
         default=Path("output_parts"),
         help="切片輸出目錄 (預設: output_parts)",
     )
@@ -103,6 +103,14 @@ def main() -> None:
     if not args.input.exists():
         print(f"錯誤：找不到指定的影片檔案 '{args.input}'", file=sys.stderr)
         sys.exit(1)
+
+    if not args.output.exists():
+        try:
+            args.output.mkdir(parents=True, exist_ok=True)
+            print(f"ℹ 預期的輸出目錄不存在，已自動建立: '{args.output}'")
+        except Exception as err:
+            print(f"錯誤：無法建立輸出目錄 '{args.output}' ({err})", file=sys.stderr)
+            sys.exit(1)
 
     config = EditorConfig(
         video_path=args.input,

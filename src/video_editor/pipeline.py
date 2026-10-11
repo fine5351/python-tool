@@ -17,6 +17,11 @@ class VideoEditorPipeline:
 
     def run(self) -> None:
         """執行完整剪輯管線。"""
+        # 確保預期的輸出目錄存在
+        if not self.config.output_dir.exists():
+            self.config.output_dir.mkdir(parents=True, exist_ok=True)
+            print(f"ℹ 預期的輸出目錄不存在，已自動建立: '{self.config.output_dir}'")
+
         print(f"=== 開始處理影片: {self.config.video_path.name} ===")
 
         # 1. 取得總長度

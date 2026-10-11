@@ -2,6 +2,13 @@
 
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Union
+
+
+def clean_path(val: Union[str, Path]) -> Path:
+    """清理路徑（自動去除兩側多餘空白與 Windows 命令列轉義殘留之引號）。"""
+    cleaned = str(val).strip().strip('"\'').strip()
+    return Path(cleaned)
 
 
 @dataclass
@@ -11,6 +18,12 @@ class EditorConfig:
     video_path: Path
     output_dir: Path = field(default_factory=lambda: Path("output_parts"))
     temp_dir: Path = field(default_factory=lambda: Path("temp_frames"))
+
+    def __post_init__(self) -> None:
+        """正規化所有檔案與目錄路徑。"""
+        self.video_path = clean_path(self.video_path)
+        self.output_dir = clean_path(self.output_dir)
+        self.temp_dir = clean_path(self.temp_dir)
 
     # 靜止畫面門檻 (秒)
     min_freeze_duration: float = 30.0
