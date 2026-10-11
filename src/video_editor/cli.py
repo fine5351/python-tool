@@ -92,6 +92,17 @@ def parse_args(args=None) -> argparse.Namespace:
         default="agy",
         help="自訂 AGY CLI 執行檔路徑",
     )
+    parser.add_argument(
+        "--temp-dir",
+        type=clean_path,
+        default=None,
+        help="暫存影格圖片目錄 (預設: 專案目錄下之 temp_frames)",
+    )
+    parser.add_argument(
+        "--keep-temp",
+        action="store_true",
+        help="保留暫存影格圖片（預設會於流程結束後自動清理）",
+    )
 
     return parser.parse_args(args)
 
@@ -112,21 +123,26 @@ def main() -> None:
             print(f"錯誤：無法建立輸出目錄 '{args.output}' ({err})", file=sys.stderr)
             sys.exit(1)
 
-    config = EditorConfig(
-        video_path=args.input,
-        output_dir=args.output,
-        min_freeze_duration=args.freeze_threshold,
-        target_min_part_len=args.min_part * 60.0,
-        target_max_part_len=args.max_part * 60.0,
-        max_search_overtime=args.max_overtime,
-        silence_noise_threshold=args.silence_noise,
-        min_silence_duration=args.min_silence,
-        ffmpeg_bin=args.ffmpeg_path,
-        ffprobe_bin=args.ffprobe_path,
-        agy_bin=args.agy_path,
-        enable_ai=not args.no_ai,
-        dry_run=args.dry_run,
-    )
+    config_kwargs = {
+        "video_path": args.input,
+        "output_dir": args.output,
+        "min_freeze_duration": args.freeze_threshold,
+        "target_min_part_len": args.min_part * 60.0,
+        "target_max_part_len": args.max_part * 60.0,
+        "max_search_overtime": args.max_overtime,
+        "silence_noise_threshold": args.silence_noise,
+        "min_silence_duration": args.min_silence,
+        "ffmpeg_bin": args.ffmpeg_path,
+        "ffprobe_bin": args.ffprobe_path,
+        "agy_bin": args.agy_path,
+        "enable_ai": not args.no_ai,
+        "dry_run": args.dry_run,
+        "keep_temp": args.keep_temp,
+    }
+    if args.temp_dir is not None:
+        config_kwargs["temp_dir"] = args.temp_dir
+
+    config = EditorConfig(**config_kwargs)
 
     pipeline = VideoEditorPipeline(config)
     try:

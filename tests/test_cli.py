@@ -27,7 +27,9 @@ class TestCLI(unittest.TestCase):
         self.assertEqual(clean_path(clean_p), Path("normal_dir"))
 
     def test_editor_config_normalizes_paths(self):
-        """測試 EditorConfig 初始化會自動將所有路徑正規化。"""
+        """測試 EditorConfig 初始化會自動將所有路徑正規化，且 temp_dir 錨定至專案根目錄。"""
+        from video_editor.config import PROJECT_ROOT
+
         cfg = EditorConfig(
             video_path='input.mp4"',
             output_dir='output_dir"',
@@ -35,7 +37,35 @@ class TestCLI(unittest.TestCase):
         )
         self.assertEqual(cfg.video_path, Path("input.mp4"))
         self.assertEqual(cfg.output_dir, Path("output_dir"))
-        self.assertEqual(cfg.temp_dir, Path("temp_dir"))
+        self.assertEqual(cfg.temp_dir, (PROJECT_ROOT / "temp_dir").resolve())
+
+    def test_temp_dir_defaults_to_project_root(self):
+        """測試 temp_dir 預設必在專案根目錄下，不受當前執行目錄影響。"""
+        from video_editor.config import PROJECT_ROOT
+
+        cfg = EditorConfig(video_path=Path("dummy.mp4"))
+        self.assertEqual(cfg.temp_dir, (PROJECT_ROOT / "temp_frames").resolve())
+
+    def test_pipeline_cleanup_temp_frames(self):
+        """測試 Pipeline 完成或結束時會自動清理暫存影格。"""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_temp_dir = Path(tmp_dir) / "test_temp_frames"
+            tmp_temp_dir.mkdir(parents=True, exist_ok=True)
+            dummy_frame = tmp_temp_dir / "cut_candidate_1.jpg"
+            dummy_frame.write_bytes(b"image_data")
+
+            cfg = EditorConfig(
+                video_path=Path("dummy.mp4"),
+                temp_dir=tmp_temp_dir,
+                keep_temp=False,
+            )
+            from video_editor.pipeline import VideoEditorPipeline
+            pipeline = VideoEditorPipeline(cfg)
+            pipeline.cleanup_temp_frames()
+
+            # 驗證暫存目錄與檔案已被清理
+            self.assertFalse(dummy_frame.exists())
+            self.assertFalse(tmp_temp_dir.exists())
 
     def test_parse_args_cleans_output_path(self):
         """測試 parse_args 能正確清理包含引號的輸出目錄參數。"""

@@ -5,6 +5,9 @@ from pathlib import Path
 from typing import Union
 
 
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+
+
 def clean_path(val: Union[str, Path]) -> Path:
     """清理路徑（自動去除兩側多餘空白與 Windows 命令列轉義殘留之引號）。"""
     cleaned = str(val).strip().strip('"\'').strip()
@@ -17,13 +20,15 @@ class EditorConfig:
 
     video_path: Path
     output_dir: Path = field(default_factory=lambda: Path("output_parts"))
-    temp_dir: Path = field(default_factory=lambda: Path("temp_frames"))
+    temp_dir: Path = field(default_factory=lambda: PROJECT_ROOT / "temp_frames")
 
     def __post_init__(self) -> None:
         """正規化所有檔案與目錄路徑。"""
         self.video_path = clean_path(self.video_path)
         self.output_dir = clean_path(self.output_dir)
         self.temp_dir = clean_path(self.temp_dir)
+        if not self.temp_dir.is_absolute():
+            self.temp_dir = (PROJECT_ROOT / self.temp_dir).resolve()
 
     # 靜止畫面門檻 (秒)
     min_freeze_duration: float = 30.0
@@ -51,3 +56,4 @@ class EditorConfig:
     # 行為開關
     enable_ai: bool = True
     dry_run: bool = False
+    keep_temp: bool = False

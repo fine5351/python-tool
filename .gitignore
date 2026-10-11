@@ -35,7 +35,9 @@ env/
 
 # Project Temporary & Output Folders
 temp_frames/
+**/temp_frames/
 output_parts/
+**/output_parts/
 *.mp4
 *.mkv
 *.mov
