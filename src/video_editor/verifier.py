@@ -77,12 +77,32 @@ class AIVerifier:
 
         return confirmed_freezes
 
-    def verify_transitions(self, cut_points: List[float]) -> List[float]:
-        """利用 AI 複審黑畫面，確認是否為合適的章節過場/讀取畫面。"""
-        if not self.config.enable_ai:
-            return cut_points
+    def _is_black_or_white_frame(self, frame_path: Path) -> bool:
+        """透過畫面亮度與統計數值精準判定是否為黑色或白色轉場畫面。"""
+        try:
+            from PIL import Image, ImageStat
 
-        print(f"\n▶ 正在進行 AI 複審：檢查 {len(cut_points)} 個轉場候選點...")
+            with Image.open(frame_path) as im:
+                gray = im.convert("L")
+                stat = ImageStat.Stat(gray)
+                mean_val = stat.mean[0]
+                stddev_val = stat.stddev[0]
+                # 黑畫面: 平均亮度極低 (低於 30 且畫面均勻)
+                if mean_val < 30.0 and stddev_val < 25.0:
+                    return True
+                # 白畫面: 平均亮度極高 (高於 220 且畫面均勻)
+                if mean_val > 220.0 and stddev_val < 25.0:
+                    return True
+        except Exception:
+            pass
+        return False
+
+    def verify_transitions(self, cut_points: List[float]) -> List[float]:
+        """複審候選點，確認是否為合適的黑畫面或白畫面過場/章節切換。"""
+        if not cut_points:
+            return []
+
+        print(f"\n▶ 正在進行轉場複審：檢查 {len(cut_points)} 個黑/白轉場候選點...")
         confirmed_cuts: List[float] = []
 
         trans_prompt = (
@@ -97,14 +117,23 @@ class AIVerifier:
             frame_path = self.config.temp_dir / f"cut_candidate_{idx}.jpg"
             try:
                 self.detector.extract_keyframe(timestamp, frame_path)
-                is_trans = self._query_agy_cli(frame_path, trans_prompt)
-            except Exception:
-                is_trans = True
-
-            if is_trans:
+            except Exception as err:
+                print(f"  - 影格截取失敗 [{timestamp:.1f}s]: {err}")
                 confirmed_cuts.append(timestamp)
+                continue
 
-        print(f"✔ 經 AI 複審後，確認 {len(confirmed_cuts)} 個有效轉場切點。")
+            # 1. 優先以影像統計值進行嚴謹之黑白轉場特徵驗證 (零延遲、高精準)
+            if self._is_black_or_white_frame(frame_path):
+                confirmed_cuts.append(timestamp)
+                continue
+
+            # 2. 若有開啟 AI，對非純色載入圖進行多模態判斷
+            if self.config.enable_ai:
+                is_trans = self._query_agy_cli(frame_path, trans_prompt)
+                if is_trans:
+                    confirmed_cuts.append(timestamp)
+
+        print(f"✔ 經複審後，確認 {len(confirmed_cuts)} 個有效黑/白轉場切點。")
         return confirmed_cuts
 
     def verify_cut_frame_stability(self, cut_time: float) -> bool:

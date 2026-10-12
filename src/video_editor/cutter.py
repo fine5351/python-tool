@@ -53,53 +53,70 @@ class VideoCutter:
         transitions: List[float],
         silences: List[Tuple[float, float]],
         ideal_cut: float,
+        require_transition: bool = True,
     ) -> float:
         """
-        在搜尋窗口內尋找最自然的切點（優先：語音說完的停頓點 + 動作定格/轉場點）。
-        絕不在台詞發音中硬切。
+        在搜尋窗口內尋找最自然的切點。
+        若 require_transition 為 True，強制只在黑色或白色轉場畫面進行分割，
+        絕不因單純台詞語音停頓而腰斬劇情對話。
         """
-        candidates: List[Tuple[float, float]] = []
+        # 1. 窗口內的黑白轉場點
+        transitions_in_window = [
+            t for t in transitions if window_start <= t <= window_end
+        ]
 
-        # 1. 檢查落在窗口內的語音停頓/靜音區間
-        for s_start, s_end in silences:
-            if s_end < window_start or s_start > window_end:
-                continue
+        if transitions_in_window:
+            scored_trans: List[Tuple[float, float]] = []
+            for t in transitions_in_window:
+                # 離理想目標時間越近越好
+                dist = abs(t - ideal_cut)
+                score = 1000.0 - (dist / 60.0) * 10.0
 
-            # 切點設在靜音區間內部（避免吃音或切到下一個字）
-            cut_t = (s_start + s_end) / 2.0
-            if cut_t < window_start or cut_t > window_end:
-                cut_t = max(window_start, min(window_end, s_start + 0.1))
+                # 若轉場同時落在靜音或語音停頓區間內，額外加分 (代表完美銜接)
+                has_silence = any(
+                    s_start - 1.0 <= t <= s_end + 1.0 for s_start, s_end in silences
+                )
+                if has_silence:
+                    score += 200.0
 
-            duration = s_end - s_start
-            score = 100.0  # 基本分數：確保是語音已講完的停頓
+                scored_trans.append((score, t))
 
-            # 停頓時間越長（代表一句話或對話段落告一段落越充分），加分
-            score += min(50.0, duration * 25.0)
+            scored_trans.sort(key=lambda x: x[0], reverse=True)
+            return scored_trans[0][1]
 
-            # 若 2 秒內伴隨黑畫面過場/讀取，大幅加分（完美過場）
-            has_trans = any(abs(t - cut_t) <= 2.0 for t in transitions)
-            if has_trans:
-                score += 300.0
+        # 2. 若窗口內無轉場，但有啟用 require_transition
+        if require_transition and transitions:
+            # 優先搜尋窗口之後最近的轉場點（即便稍微延後，也絕不在對話中腰斬）
+            future_trans = [t for t in transitions if t > window_end]
+            if future_trans:
+                return future_trans[0]
 
-            # 離理想目標時間越近越好
-            dist_to_ideal = abs(cut_t - ideal_cut)
-            score -= (dist_to_ideal / 60.0) * 8.0
+            # 若後面無轉場，但在窗口前附近有轉場
+            past_trans = [t for t in transitions if t < window_start]
+            if past_trans:
+                return past_trans[-1]
 
-            candidates.append((score, cut_t))
+        # 3. 若完全無轉場點或未強制轉場：退回檢查語音停頓
+        if not require_transition or not transitions:
+            silence_candidates: List[Tuple[float, float]] = []
+            for s_start, s_end in silences:
+                if s_end < window_start or s_start > window_end:
+                    continue
 
-        # 2. 窗口內的轉場點 (黑畫面)
-        for t in transitions:
-            if window_start <= t <= window_end:
-                dist_to_ideal = abs(t - ideal_cut)
-                score = 80.0 - (dist_to_ideal / 60.0) * 8.0
-                candidates.append((score, t))
+                cut_t = (s_start + s_end) / 2.0
+                if cut_t < window_start or cut_t > window_end:
+                    cut_t = max(window_start, min(window_end, s_start + 0.1))
 
-        # 3. 若有找到自然的停頓點，挑選最高分者
-        if candidates:
-            candidates.sort(key=lambda x: x[0], reverse=True)
-            return candidates[0][1]
+                duration = s_end - s_start
+                score = 100.0 + min(50.0, duration * 25.0)
+                score -= (abs(cut_t - ideal_cut) / 60.0) * 8.0
+                silence_candidates.append((score, cut_t))
 
-        # 4. 若無任何停頓點，退回到窗口上限
+            if silence_candidates:
+                silence_candidates.sort(key=lambda x: x[0], reverse=True)
+                return silence_candidates[0][1]
+
+        # 4. 保底退回窗口上限
         return window_end
 
     @staticmethod
@@ -109,11 +126,13 @@ class VideoCutter:
         silences: List[Tuple[float, float]],
         min_len: float,
         max_len: float,
-        max_overtime: float = 90.0,
+        max_overtime: float = 180.0,
+        require_transition: bool = True,
+        detector: object = None,
     ) -> List[Tuple[float, float]]:
         """
         在有效區間內規劃每集切片時間段。
-        嚴格考量語音是否講完、動作是否做完（優先落在語音停頓與轉場點）。
+        若 require_transition 為 True，強制只在黑色或白色轉場畫面進行分割。
         """
         planned_slices: List[Tuple[float, float]] = []
 
@@ -123,6 +142,12 @@ class VideoCutter:
                 planned_slices.append((seg_start, seg_end))
                 continue
 
+            # 篩選當前有效區間內的轉場與停頓點
+            seg_transitions = [t for t in transitions if seg_start <= t <= seg_end]
+            seg_silences = [
+                s for s in silences if seg_start <= s[0] and s[1] <= seg_end
+            ]
+
             sub_start = seg_start
             while sub_start < seg_end:
                 remaining = seg_end - sub_start
@@ -131,21 +156,36 @@ class VideoCutter:
                     break
 
                 target_window_start = sub_start + min_len
-                # 允許為了等待話講完或動作做完，最多延後 max_overtime 秒搜尋切點
                 target_window_end = min(seg_end, sub_start + max_len + max_overtime)
                 ideal_cut = sub_start + (min_len + max_len) / 2.0
 
                 cut_time = VideoCutter.find_natural_cut_point(
                     window_start=target_window_start,
                     window_end=target_window_end,
-                    transitions=transitions,
-                    silences=silences,
+                    transitions=seg_transitions,
+                    silences=seg_silences,
                     ideal_cut=ideal_cut,
+                    require_transition=require_transition,
                 )
 
                 # 若選出的切點過於接近開頭（異常情況），強制至少切出 min_len
                 if cut_time <= sub_start:
                     cut_time = min(seg_end, sub_start + max_len)
+
+                # 若提供 detector 且切點在片段內部，嘗試對齊至最近的關鍵影格 (Keyframe)，
+                # 確保無損流複製 (-c copy) 切片完全無重疊與雜音
+                if detector is not None and hasattr(detector, "find_nearest_keyframe"):
+                    try:
+                        kf = detector.find_nearest_keyframe(cut_time, search_window=2.0)
+                        if (
+                            kf is not None
+                            and abs(kf - cut_time) <= 2.5
+                            and kf > sub_start
+                            and kf < seg_end
+                        ):
+                            cut_time = kf
+                    except Exception:
+                        pass
 
                 planned_slices.append((sub_start, cut_time))
                 sub_start = cut_time
@@ -176,7 +216,7 @@ class VideoCutter:
             if self.config.dry_run:
                 continue
 
-            # 使用 -c copy 進行秒級無損切片
+            # 使用 -c copy 進行秒級無損切片，並加上 -avoid_negative_ts make_zero 防止時間戳記重疊
             cmd = [
                 self.config.ffmpeg_bin,
                 "-y",
@@ -184,6 +224,7 @@ class VideoCutter:
                 "-to", str(end),
                 "-i", str(self.config.video_path),
                 "-c", "copy",
+                "-avoid_negative_ts", "make_zero",
                 str(out_path),
             ]
             subprocess.run(

@@ -112,6 +112,63 @@ class TestTimeline(unittest.TestCase):
         self.assertEqual(output_files[0].name, "4.6-月升之前,與獸共舞-1.mp4")
         self.assertEqual(output_files[1].name, "4.6-月升之前,與獸共舞-2.mp4")
 
+    def test_plan_slices_force_transition_over_dialogue_pause(self):
+        """強制在黑白轉場分割：即使台詞中有停頓，也絕對優先選擇黑白轉場點。"""
+        valid_segments = [(0.0, 3600.0)]
+        # 在 1432.0 有黑白轉場點，在 1541.0 有對話句間的語音停頓
+        transitions = [1432.0]
+        silences = [(1540.8, 1541.5)]
+        slices = VideoCutter.plan_slices(
+            valid_segments=valid_segments,
+            transitions=transitions,
+            silences=silences,
+            min_len=1200.0,
+            max_len=1800.0,
+            require_transition=True,
+        )
+        # 第一刀必須切在 1432.0 轉場點，絕不能因 1541.0 有語音停頓而在台詞中硬切
+        self.assertEqual(slices[0], (0.0, 1432.0))
+
+    def test_plan_slices_waits_for_future_transition_when_forced(self):
+        """強制轉場時，若窗口內無轉場但後續有轉場點，應主動等待並切在該轉場點。"""
+        valid_segments = [(0.0, 4000.0)]
+        # 窗口為 1200 ~ 1800，最近的轉場點在 1920.0
+        transitions = [1920.0]
+        silences = [(1500.0, 1500.8)]
+        slices = VideoCutter.plan_slices(
+            valid_segments=valid_segments,
+            transitions=transitions,
+            silences=silences,
+            min_len=1200.0,
+            max_len=1800.0,
+            max_overtime=180.0,
+            require_transition=True,
+        )
+        # 應等待至 1920.0 轉場點，而非在 1500.0 或 1800.0 硬切
+        self.assertEqual(slices[0], (0.0, 1920.0))
+
+    def test_plan_slices_keyframe_snapping(self):
+        """測試若提供 detector，切點會自動微調吸附至轉場區間內之關鍵影格。"""
+        class MockDetector:
+            def find_nearest_keyframe(self, t, search_window=2.0):
+                # 假設在 1433.86 有關鍵影格
+                if abs(t - 1432.0) <= 2.0:
+                    return 1433.86
+                return None
+
+        valid_segments = [(0.0, 3600.0)]
+        transitions = [1432.0]
+        slices = VideoCutter.plan_slices(
+            valid_segments=valid_segments,
+            transitions=transitions,
+            silences=[],
+            min_len=1200.0,
+            max_len=1800.0,
+            detector=MockDetector(),
+        )
+        # 切點應自動微調吸附至 1433.86 關鍵影格
+        self.assertEqual(slices[0], (0.0, 1433.86))
+
 
 if __name__ == "__main__":
     unittest.main()

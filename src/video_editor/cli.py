@@ -61,8 +61,33 @@ def parse_args(args=None) -> argparse.Namespace:
     parser.add_argument(
         "--max-overtime",
         type=float,
-        default=90.0,
-        help="為了等待話講完或動作做完，允許最多延後的秒數 (秒，預設: 90)",
+        default=180.0,
+        help="為了等待黑白轉場畫面出現，允許最多延後的秒數 (秒，預設: 180)",
+    )
+    parser.add_argument(
+        "--no-require-transition",
+        dest="require_transition",
+        action="store_false",
+        help="停用強制黑白轉場分割（允許在無轉場時退回語音停頓切片）",
+    )
+    parser.set_defaults(require_transition=True)
+    parser.add_argument(
+        "--white-duration",
+        type=float,
+        default=0.5,
+        help="白畫面轉場判定最短秒數 (秒，預設: 0.5)",
+    )
+    parser.add_argument(
+        "--white-pixel",
+        type=float,
+        default=0.10,
+        help="白畫面像素門檻 (預設: 0.10)",
+    )
+    parser.add_argument(
+        "--white-ratio",
+        type=float,
+        default=0.98,
+        help="白畫面佔比門檻 (預設: 0.98)",
     )
     parser.add_argument(
         "--no-ai",
@@ -132,6 +157,10 @@ def main() -> None:
         "max_search_overtime": args.max_overtime,
         "silence_noise_threshold": args.silence_noise,
         "min_silence_duration": args.min_silence,
+        "min_white_duration": args.white_duration,
+        "white_pixel_threshold": args.white_pixel,
+        "white_ratio_threshold": args.white_ratio,
+        "require_transition": args.require_transition,
         "ffmpeg_bin": args.ffmpeg_path,
         "ffprobe_bin": args.ffprobe_path,
         "agy_bin": args.agy_path,

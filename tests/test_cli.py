@@ -72,6 +72,21 @@ class TestCLI(unittest.TestCase):
         args = parse_args(["-i", "video.mp4", "-o", 'my_output"'])
         self.assertEqual(args.output, Path("my_output"))
         self.assertEqual(args.input, Path("video.mp4"))
+        self.assertTrue(args.require_transition)
+
+    def test_parse_args_white_and_transition_flags(self):
+        """測試 parse_args 能正確解析白畫面參數與強制轉場開關。"""
+        args = parse_args([
+            "-i", "video.mp4",
+            "--no-require-transition",
+            "--white-duration", "1.2",
+            "--white-pixel", "0.15",
+            "--white-ratio", "0.95",
+        ])
+        self.assertFalse(args.require_transition)
+        self.assertEqual(args.white_duration, 1.2)
+        self.assertEqual(args.white_pixel, 0.15)
+        self.assertEqual(args.white_ratio, 0.95)
 
     def test_main_creates_output_dir_if_not_exists(self):
         """測試當預期的 output 目錄不存在時，主程式會自行建立。"""

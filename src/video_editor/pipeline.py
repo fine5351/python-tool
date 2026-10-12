@@ -55,7 +55,7 @@ class VideoEditorPipeline:
             confirmed_freezes = self.verifier.verify_freezes(raw_freezes)
             confirmed_cuts = self.verifier.verify_transitions(raw_blacks)
 
-            # 4. 規劃有效區間與考量語音/動作的自然切點
+            # 4. 規劃有效區間與考量黑白轉場畫面切點 (防止台詞中斷與音訊重疊)
             valid_segments = self.cutter.calculate_valid_segments(
                 total_duration, confirmed_freezes
             )
@@ -66,6 +66,8 @@ class VideoEditorPipeline:
                 min_len=self.config.target_min_part_len,
                 max_len=self.config.target_max_part_len,
                 max_overtime=self.config.max_search_overtime,
+                require_transition=self.config.require_transition,
+                detector=self.detector,
             )
 
             # 5. 若啟用 AI，對各集切點進行動作定格與畫面穩定度抽檢

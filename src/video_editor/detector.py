@@ -1,5 +1,6 @@
 """影片特徵偵測模組（透過 FFmpeg 快速篩選靜止與過場）。"""
 
+import json
 import os
 import re
 import shutil
@@ -130,27 +131,30 @@ class VideoDetector:
             ) from err
 
     def detect_freeze_and_black(self) -> Tuple[List[Tuple[float, float]], List[float]]:
-        """高速掃描整部影片，取得疑似暫離的靜止區間與黑畫面切點。"""
+        """高速掃描整部影片，取得疑似暫離的靜止區間與黑/白畫面轉場切點。"""
         self.check_tools()
 
         filter_spec = (
-            f"freezedetect=n=-50dB:d={self.config.min_freeze_duration},"
-            f"blackdetect=d={self.config.min_black_duration}:"
+            f"[0:v]freezedetect=n=-50dB:d={self.config.min_freeze_duration},"
+            f"split=2[v1][v2];"
+            f"[v1]blackdetect=d={self.config.min_black_duration}:"
             f"pic_th={self.config.black_ratio_threshold}:"
-            f"pix_th={self.config.black_pixel_threshold}"
+            f"pix_th={self.config.black_pixel_threshold}[bd];"
+            f"[v2]negate,blackdetect=d={self.config.min_white_duration}:"
+            f"pic_th={self.config.white_ratio_threshold}:"
+            f"pix_th={self.config.white_pixel_threshold}[wd]"
         )
 
         cmd = [
             self.config.ffmpeg_bin,
             "-hide_banner",
             "-i", str(self.config.video_path),
-            "-vf", filter_spec,
-            "-an",
-            "-f", "null",
-            "-",
+            "-filter_complex", filter_spec,
+            "-map", "[bd]", "-an", "-f", "null", "-",
+            "-map", "[wd]", "-an", "-f", "null", "-",
         ]
 
-        print("▶ 正在執行 FFmpeg 快速掃描（分析靜止畫面與黑畫面過場）...")
+        print("▶ 正在執行 FFmpeg 快速掃描（分析靜止畫面與黑/白畫面轉場）...")
         process = subprocess.Popen(
             cmd,
             stdout=subprocess.PIPE,
@@ -162,7 +166,7 @@ class VideoDetector:
         _, stderr_output = process.communicate()
 
         freeze_ranges: List[Tuple[float, float]] = []
-        black_cuts: List[float] = []
+        raw_transitions: List[Tuple[float, float]] = []
 
         current_freeze_start = None
         for line in stderr_output.splitlines():
@@ -178,20 +182,74 @@ class VideoDetector:
                     freeze_ranges.append((current_freeze_start, freeze_end))
                     current_freeze_start = None
 
-            # 解析 blackdetect 輸出
+            # 解析 blackdetect 與白畫面 (negate -> blackdetect) 輸出
             if "black_start:" in line and "black_end:" in line:
                 m_start = re.search(r"black_start:\s*([\d\.]+)", line)
                 m_end = re.search(r"black_end:\s*([\d\.]+)", line)
                 if m_start and m_end:
                     b_start = float(m_start.group(1))
                     b_end = float(m_end.group(1))
-                    black_cuts.append((b_start + b_end) / 2.0)
+                    if b_end > b_start:
+                        raw_transitions.append((b_start, b_end))
+
+        # 排序並合併時間相鄰 (<1.0s) 或重疊的轉場區間
+        sorted_trans = sorted(raw_transitions, key=lambda x: x[0])
+        merged_trans: List[Tuple[float, float]] = []
+        for start, end in sorted_trans:
+            if not merged_trans or start > merged_trans[-1][1] + 1.0:
+                merged_trans.append((start, end))
+            else:
+                merged_trans[-1] = (
+                    merged_trans[-1][0],
+                    max(merged_trans[-1][1], end),
+                )
+
+        transition_cuts = [(s + e) / 2.0 for s, e in merged_trans]
 
         print(
             f"✔ 掃描完成：找到 {len(freeze_ranges)} 個疑似暫離靜止區間，"
-            f"{len(black_cuts)} 個黑畫面轉場候選點。"
+            f"{len(transition_cuts)} 個黑/白畫面轉場候選點。"
         )
-        return freeze_ranges, black_cuts
+        return freeze_ranges, transition_cuts
+
+    def find_nearest_keyframe(
+        self, timestamp: float, search_window: float = 3.0
+    ) -> Optional[float]:
+        """在指定時間戳記前後快速搜尋最近的關鍵影格 (Keyframe / I-frame)。"""
+        start_t = max(0.0, timestamp - search_window)
+        end_t = timestamp + search_window
+        cmd = [
+            self.config.ffprobe_bin,
+            "-v", "error",
+            "-select_streams", "v",
+            "-show_frames",
+            "-show_entries", "frame=pts_time,key_frame",
+            "-read_intervals", f"{start_t:.2f}%{end_t:.2f}",
+            "-of", "json",
+            str(self.config.video_path),
+        ]
+        try:
+            result = subprocess.run(
+                cmd,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+            )
+            if result.returncode != 0:
+                return None
+            data = json.loads(result.stdout)
+            keyframes = [
+                float(f["pts_time"])
+                for f in data.get("frames", [])
+                if f.get("key_frame") == 1 and "pts_time" in f
+            ]
+            if keyframes:
+                return min(keyframes, key=lambda k: abs(k - timestamp))
+        except Exception:
+            pass
+        return None
 
     def detect_silences(self) -> List[Tuple[float, float]]:
         """高速掃描音訊中的語音停頓與靜音區間（確保切點不中斷說話台詞）。"""
