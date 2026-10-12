@@ -184,6 +184,14 @@ def main():
     parser_multi.add_argument("--category", type=str, help="Bilibili 分區", default="游戏")
     parser_multi.add_argument("--platforms", type=str, help="指定發佈平台 (例如: youtube,bilibili)，預設為所有平台", default="")
 
+    # Attach to running Chrome
+    parser_attach = subparsers.add_parser("attach", help="接入目前正在運行的 Chrome 實例進行除錯或控制")
+    parser_attach.add_argument("--port", type=int, default=WebDriverUtil.DEFAULT_DEBUG_PORT, help="Chrome 遠端除錯埠號 (預設: 9222)")
+    parser_attach.add_argument("--host", type=str, default="127.0.0.1", help="Chrome 遠端主機位址 (預設: 127.0.0.1)")
+    parser_attach.add_argument("--data-dir", type=str, default=None, help="指定 Chrome Profile 目錄 (預設: 專案專用 chrome-data 目錄)")
+    parser_attach.add_argument("--no-auto-launch", action="store_true", help="若除錯埠未啟動，不自動啟動 Chrome")
+    parser_attach.add_argument("--repl", action="store_true", help="連線成功後直接進入 Python REPL 環境")
+
     args = parser.parse_args()
 
     tracker = OperationTrailTracker.get_instance()
@@ -196,7 +204,23 @@ def main():
         parser.print_help()
         return
 
-    hashtags = [t.strip() for t in args.tags.split(",")] if args.tags else []
+    if args.command == "attach":
+        import subprocess
+        script_path = os.path.normpath(os.path.join(os.path.dirname(__file__), "..", "..", "script", "attach_chrome.py"))
+        cmd = [sys.executable, script_path]
+        if args.port:
+            cmd.extend(["--port", str(args.port)])
+        if args.host:
+            cmd.extend(["--host", args.host])
+        if getattr(args, "data_dir", None):
+            cmd.extend(["--data-dir", args.data_dir])
+        if getattr(args, "no_auto_launch", False):
+            cmd.append("--no-auto-launch")
+        if getattr(args, "repl", False):
+            cmd.append("--repl")
+        sys.exit(subprocess.call(cmd))
+
+    hashtags = [t.strip() for t in args.tags.split(",")] if getattr(args, "tags", None) else []
     target_platforms = [p.strip().lower() for p in args.platforms.split(",")] if getattr(args, "platforms", None) else None
 
     VIDEO_EXTENSIONS = ('.mp4', '.mkv', '.mov', '.flv', '.avi', '.webm', '.wmv')

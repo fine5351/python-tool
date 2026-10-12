@@ -84,6 +84,27 @@ python -m video_rpa.cli rednote --file "video.mp4" --desc "小紅書筆記內容
 python -m video_rpa.cli tiktok --file "video.mp4" --desc "TikTok 影片文案" --tags "TikTokTags"
 ```
 
+### 5. 接入運行中的 Chrome 實例 (Attach to Running Chrome)
+當您需要除錯、檢視現場分頁、或在手動登入後透過腳本接管操作時，可直接運行接入腳本：
+```powershell
+# 方式 1: 直接執行 Python 接入腳本 (支援自動偵測與啟動 Chrome、分頁切換、REPL)
+python script/attach_chrome.py
+
+# 方式 2: 使用 PowerShell 快捷腳本
+.\script\attach_chrome.ps1
+
+# 方式 3: 透過 CLI attach 子命令
+python -m video_rpa.cli attach
+
+# 常用參數：
+#   --port 9222        指定除錯連接埠 (預設 9222)
+#   --auto-launch      若尚未啟動除錯版 Chrome，自動為您啟動
+#   --repl             連線成功後直接進入 Python 互動環境 (可直接使用 driver 物件)
+```
+> [!NOTE]
+> 退出接入工具時，預設**不會**關閉您的 Chrome 瀏覽器，保護操作現場不受中斷。若需手動以除錯模式啟動 Chrome，亦可執行 `.\script\start_debug_chrome.ps1`。
+
+
 ### 常用參數說明
 | 參數名稱 | 適用命令 | 說明 |
 | :--- | :--- | :--- |
@@ -161,6 +182,12 @@ flowchart TD
 ├── tests/                             # 單元測試套件
 │   ├── conftest.py                    # 測試環境自動設定
 │   ├── test_trail_tracker.py          # 軌跡追蹤與首位晉升測試
-│   └── test_youtube_self_healing.py   # 自癒驅動測試
-└── script/                            # 常用快捷執行腳本 (zzz.ps1, gi.ps1 等)
+│   ├── test_youtube_self_healing.py   # 自癒驅動測試
+│   └── test_attach_chrome.py          # 執行時期接入與除錯埠測試
+└── script/                            # 常用快捷執行腳本
+    ├── attach_chrome.py               # Chrome 執行時期接入主腳本 (附帶分頁控制與 REPL)
+    ├── attach_chrome.ps1              # Windows PowerShell 一鍵接入快捷腳本
+    ├── start_debug_chrome.ps1         # 一鍵啟動除錯版 Chrome (Port 9222)
+    ├── zzz.ps1                        # 絕區零上傳範例腳本
+    └── gi.ps1                         # 原神上傳範例腳本
 ```

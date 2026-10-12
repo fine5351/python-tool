@@ -20,6 +20,7 @@ logger = logging.getLogger(__name__)
 
 class WebDriverUtil:
     CHROME_DATA_DIR = "d:/work/workspace/java/rpa/chrome-data"
+    DEFAULT_DEBUG_PORT = 9222
 
     @staticmethod
     def _cleanup_chrome(data_dir: str):
@@ -101,7 +102,7 @@ class WebDriverUtil:
                 return None
 
     @staticmethod
-    def _create_options(user_data_dir: str, binary_location: Optional[str] = None) -> Options:
+    def _create_options(user_data_dir: str, binary_location: Optional[str] = None, debug_port: Optional[int] = None) -> Options:
         options = Options()
         if binary_location and os.path.exists(binary_location):
             options.binary_location = binary_location
@@ -117,6 +118,8 @@ class WebDriverUtil:
         options.add_argument("--disable-gpu-compositing")
         options.add_argument("--no-zygote")
         options.add_argument("--remote-allow-origins=*")
+        if debug_port is not None:
+            options.add_argument(f"--remote-debugging-port={debug_port}")
         options.add_argument("--disable-extensions")
         options.add_argument("--start-maximized")
         return options
@@ -161,6 +164,102 @@ class WebDriverUtil:
             except Exception as e2:
                 logger.error(f"Critical failure: Chrome cannot start even with a fresh profile. Error: {e2}")
                 raise e2
+
+    @staticmethod
+    def is_debug_port_open(host: str = "127.0.0.1", port: int = DEFAULT_DEBUG_PORT, timeout: float = 1.0) -> bool:
+        """檢查指定的遠端除錯埠是否正在監聽中."""
+        import socket
+        try:
+            with socket.create_connection((host, port), timeout=timeout):
+                return True
+        except (socket.timeout, ConnectionRefusedError, OSError):
+            return False
+
+    @staticmethod
+    def attach_driver(host: str = "127.0.0.1", port: int = DEFAULT_DEBUG_PORT) -> webdriver.Chrome:
+        """接入現有已在運行且開啟 remote-debugging-port 的 Chrome 瀏覽器實例."""
+        if not WebDriverUtil.is_debug_port_open(host, port):
+            raise ConnectionError(
+                f"無法連線至 Chrome 遠端除錯埠 {host}:{port}。\n"
+                f"請確認 Chrome 是否已透過 --remote-debugging-port={port} 參數啟動。"
+            )
+
+        options = Options()
+        options.add_experimental_option("debuggerAddress", f"{host}:{port}")
+
+        chrome_version = WebDriverUtil.get_chrome_version()
+        driver_path = ChromeDriverManager(driver_version=chrome_version).install() if chrome_version else ChromeDriverManager().install()
+        service = Service(driver_path)
+
+        logger.info(f"正在接入運行中的 Chrome (除錯地址: {host}:{port})...")
+        driver = webdriver.Chrome(service=service, options=options)
+        logger.info(f"成功接入運行中的 Chrome！當前頁面標題: {driver.title}")
+        return driver
+
+    @staticmethod
+    def _find_chrome_executable() -> str:
+        """多重路徑自動偵測 Google Chrome 執行檔路徑."""
+        candidates = [
+            r"C:\Program Files\Google\Chrome\Application\chrome.exe",
+            r"C:\Program Files (x86)\Google\Chrome\Application\chrome.exe",
+            os.path.expandvars(r"%LOCALAPPDATA%\Google\Chrome\Application\chrome.exe"),
+            os.path.expandvars(r"%PROGRAMFILES%\Google\Chrome\Application\chrome.exe"),
+            os.path.expandvars(r"%PROGRAMFILES(X86)%\Google\Chrome\Application\chrome.exe"),
+        ]
+        for c in candidates:
+            if os.path.exists(c):
+                return c
+        import shutil
+        return shutil.which("chrome.exe") or shutil.which("chrome") or "chrome.exe"
+
+    @staticmethod
+    def launch_debug_chrome(port: int = DEFAULT_DEBUG_PORT, data_dir: Optional[str] = None) -> subprocess.Popen:
+        """以獨立行程啟動開啟 remote-debugging-port 的 Chrome 瀏覽器 (使用專案專用 profile)."""
+        data_dir = data_dir or WebDriverUtil.CHROME_DATA_DIR
+        norm_dir = os.path.normpath(data_dir)
+        if not os.path.exists(norm_dir):
+            try:
+                os.makedirs(norm_dir, exist_ok=True)
+            except Exception as e:
+                logger.warning(f"建立 Chrome Profile 目錄失敗: {e}")
+
+        # 清除可能的殘留鎖定檔案以確保能順利啟動
+        for lock_name in ["SingletonLock", "DevToolsActivePort"]:
+            lock_path = os.path.join(norm_dir, lock_name)
+            if os.path.exists(lock_path):
+                try:
+                    os.remove(lock_path)
+                except Exception:
+                    pass
+
+        chrome_path = WebDriverUtil._find_chrome_executable()
+
+        cmd = [
+            chrome_path,
+            f"--remote-debugging-port={port}",
+            f"--user-data-dir={norm_dir}",
+            "--remote-allow-origins=*",
+            "--no-first-run",
+            "--no-default-browser-check"
+        ]
+        logger.info(f"啟動除錯模式 Chrome (Profile: {norm_dir}): {' '.join(cmd)}")
+        return subprocess.Popen(cmd)
+
+    @staticmethod
+    def get_or_create_driver(host: str = "127.0.0.1", port: int = DEFAULT_DEBUG_PORT, data_dir: Optional[str] = None, timeout: float = 10.0) -> webdriver.Chrome:
+        """接入運行中的 Chrome，若當前未開啟則使用本專案專用 Profile 自動啟動並接入."""
+        if not WebDriverUtil.is_debug_port_open(host, port):
+            logger.info(f"未偵測到運行中的 Chrome ({host}:{port})，正在使用專案專用 Profile 自動啟動...")
+            WebDriverUtil.launch_debug_chrome(port=port, data_dir=data_dir)
+            start_time = time.time()
+            while time.time() - start_time < timeout:
+                if WebDriverUtil.is_debug_port_open(host, port):
+                    break
+                time.sleep(0.3)
+            else:
+                raise TimeoutError(f"啟動 Chrome 超時，無法於 {timeout} 秒內連線至除錯埠 {host}:{port}。")
+
+        return WebDriverUtil.attach_driver(host, port)
 
     @staticmethod
     def find_element(driver: webdriver.Chrome, step_name: str, by: str, value: str, element_name: str, timeout: int = 5) -> WebElement:
