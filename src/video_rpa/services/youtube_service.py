@@ -10,6 +10,7 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import WebDriverWait
 
 from video_rpa.constants import AutoAppendHashtag
+from video_rpa.core.hitl_controller import HitlInterventionController
 from video_rpa.core.knowledge_store import KnowledgeStore
 from video_rpa.core.smart_driver import SmartDriver
 from video_rpa.core.vision_analyzer import VisionAnalyzer
@@ -38,6 +39,7 @@ class YouTubeService:
         driver = None
         success = False
         try:
+            HitlInterventionController.get_instance().start_controller_window("YouTube 影片上傳流程啟動...")
             driver = WebDriverUtil.initialize_driver()
             self._ensure_smart_driver(driver)
             self.start_upload_form(driver, file_path, title, description, playlist, visibility, hashtags)
@@ -229,10 +231,28 @@ class YouTubeService:
 
     def _wait_for_upload_complete(self, driver, timeout: int = 3600):
         logger.info("步驟 : 等待 YouTube 影片上傳完成...")
+        HitlInterventionController.get_instance().update_status("等待 YouTube 影片上傳完成 (若卡住可點控制台啟用 Agent)")
         start_time = time.time()
         last_logged = 0
 
         while time.time() - start_time < timeout:
+            # 1. 檢查使用者是否透過控制台強制略過
+            if HitlInterventionController.get_instance().consume_skip():
+                logger.info("使用者透過控制台手動標記上傳完成！")
+                return
+
+            # 2. 檢查使用者是否透過輸入窗請求啟用 Agent 畫面探索
+            if HitlInterventionController.get_instance().is_intervention_requested():
+                instruction = HitlInterventionController.get_instance().consume_intervention()
+                logger.info(f"檢測到使用者主動介入請求，啟用 Agent 畫面探索: '{instruction}'")
+                exploration = self.smart_driver.execute_agent_screen_exploration(
+                    current_step_name="等待 YouTube 影片上傳完成",
+                    user_instruction=instruction or ""
+                )
+                if exploration.get("completed"):
+                    logger.info("Agent 判定影片上傳/發布已完成，退出等待循環。")
+                    return
+
             self.smart_driver.check_and_dismiss_known_popups()
 
             is_uploading = False
@@ -261,7 +281,7 @@ class YouTubeService:
                 pass
 
             if not is_uploading:
-                # Check 2: Check explicit completion indicators specifically within active dialog or bottom drawer
+                # Check 2: Check explicit completion indicators specifically within active dialog or bottom drawer, or published dialog
                 try:
                     complete_elements = driver.find_elements(
                         By.XPATH,
@@ -269,11 +289,14 @@ class YouTubeService:
                         "contains(text(), 'Upload complete') or contains(text(), '即將開始處理') or "
                         "contains(text(), '處理中') or contains(text(), '檢查完畢') or contains(text(), 'No issues found') or contains(text(), '100%')] | "
                         "//ytcp-video-upload-progress//*[contains(text(), '上傳完畢') or contains(text(), 'Upload complete') or contains(text(), '即將開始處理') or contains(text(), '100%')] | "
-                        "//div[contains(@class, 'progress-label') and (contains(text(), '上傳完畢') or contains(text(), 'Upload complete') or contains(text(), '即將開始處理') or contains(text(), '100%'))]"
+                        "//div[contains(@class, 'progress-label') and (contains(text(), '上傳完畢') or contains(text(), 'Upload complete') or contains(text(), '即將開始處理') or contains(text(), '100%'))] | "
+                        "//ytcp-video-share-dialog | "
+                        "//*[contains(text(), '影片已發布') or contains(text(), 'Video published')] | "
+                        "//ytcp-button[@id='close-button' and .//*[contains(text(), '關閉') or contains(text(), 'Close')]]"
                     )
                     if any(el.is_displayed() for el in complete_elements):
-                        logger.info("檢測到 YouTube 影片上傳完成/進入處理階段！")
-                        time.sleep(2)
+                        logger.info("檢測到 YouTube 影片上傳完成或已發布彈窗 (Video Published Dialog)！")
+                        time.sleep(1)
                         return
                 except Exception:
                     pass
@@ -323,6 +346,7 @@ class YouTubeService:
 
     def _save_and_close(self, driver):
         logger.info("步驟 : 點擊發布/完成按鈕...")
+        HitlInterventionController.get_instance().update_status("點擊發布/完成按鈕")
         self.smart_driver.check_and_dismiss_known_popups()
         self.smart_driver.click_step("done_button", timeout=15)
         logger.info("已點擊 Done/Publish 按鈕。")
@@ -335,5 +359,21 @@ class YouTubeService:
         self._wait_for_upload_complete(driver)
 
         # Dismiss final success dialog if present
-        self.smart_driver.click_step("close_dialog_button", timeout=15)
+        HitlInterventionController.get_instance().update_status("關閉上傳成功對話框")
+        clicked_close = self.smart_driver.click_step("close_dialog_button", timeout=10)
+        if not clicked_close:
+            try:
+                close_btns = driver.find_elements(
+                    By.XPATH,
+                    "//ytcp-video-share-dialog//ytcp-button | "
+                    "//ytcp-button[.//div[contains(text(), '關閉') or contains(text(), 'Close')]] | "
+                    "//*[contains(text(), '關閉')]/ancestor::ytcp-button"
+                )
+                for btn in close_btns:
+                    if btn.is_displayed():
+                        WebDriverUtil.dispatch_click_events(driver, btn)
+                        logger.info("已透過備用關閉選擇器關閉發布對話框。")
+                        break
+            except Exception:
+                pass
         logger.info("YouTube 影片發布流程全部完成！")

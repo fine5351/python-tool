@@ -37,7 +37,7 @@
         {
           "by": "xpath",
           "value": "//input[contains(@placeholder, '请输入稿件标题') or contains(@placeholder, '稿件标题')]",
-          "weight": 73
+          "weight": 127
         },
         {
           "by": "xpath",
@@ -59,7 +59,7 @@
         {
           "by": "xpath",
           "value": "//input[@placeholder='请选择符合您视频内容的创作声明' or contains(@placeholder, '创作声明')]",
-          "weight": 20
+          "weight": 122
         }
       ]
     },
@@ -71,7 +71,7 @@
         {
           "by": "xpath",
           "value": "//li[contains(@class, 'bcc-option') and .//span[contains(text(), '内容无需标注')]]",
-          "weight": 20
+          "weight": 120
         },
         {
           "by": "xpath",
@@ -92,7 +92,7 @@
         {
           "by": "css",
           "value": "div.ql-editor[contenteditable='true'][data-placeholder*='填写更全面的相关信息']",
-          "weight": 70
+          "weight": 124
         },
         {
           "by": "xpath",
@@ -109,7 +109,7 @@
         {
           "by": "css",
           "value": ".select-controller",
-          "weight": 18
+          "weight": 72
         }
       ]
     },
@@ -121,7 +121,7 @@
         {
           "by": "xpath",
           "value": "//input[contains(@class, 'input-val') and contains(@placeholder, '创建标签')]",
-          "weight": 73
+          "weight": 127
         },
         {
           "by": "xpath",
@@ -137,7 +137,7 @@
         {
           "by": "xpath",
           "value": "//*[contains(@class, 'submit-add') and contains(text(), '立即投稿')]",
-          "weight": 65
+          "weight": 113
         },
         {
           "by": "xpath",

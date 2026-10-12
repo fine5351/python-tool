@@ -14,6 +14,7 @@ except ImportError:
 
 from natsort import natsorted
 
+from video_rpa.core.hitl_controller import HitlInterventionController
 from video_rpa.core.trail_tracker import OperationTrailTracker
 from video_rpa.services.bilibili_service import BilibiliService
 from video_rpa.services.rednote_service import rednoteService
@@ -50,6 +51,7 @@ def process_multi_platform_upload(file_path: str, description: str, playlist: st
     failed_platforms = []
 
     try:
+        HitlInterventionController.get_instance().start_controller_window(f"多平台批量上傳啟動 ({title})...")
         driver = WebDriverUtil.initialize_driver()
         platforms = []
         is_first_tab = True
@@ -259,6 +261,7 @@ def main():
             sys.exit(1)
 
     finally:
+        HitlInterventionController.get_instance().close()
         # 任務結束後輸出 log 表示需要回寫 script 進行固化
         tracker.print_consolidation_log(logger)
 
@@ -268,6 +271,7 @@ if __name__ == "__main__":
         main()
     except KeyboardInterrupt:
         logger.info("\n [系統] 接收到中斷指令 (Ctrl+C)，正在安全關閉並結束程式...")
+        HitlInterventionController.get_instance().close()
         OperationTrailTracker.get_instance().print_consolidation_log(logger)
         try:
             sys.exit(0)

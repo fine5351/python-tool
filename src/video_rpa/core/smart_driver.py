@@ -316,3 +316,106 @@ class SmartDriver:
                 logger.error(f"Failed to input text for step [{step_id}]: {e}")
                 return False
         return False
+
+    def execute_agent_screen_exploration(self, current_step_name: str, user_instruction: str = "") -> Dict[str, Any]:
+        """截取當前畫面，調用 Agent 進行畫面探索並決定下一步操作.
+
+        處理使用者透過輸入窗所請求的介入，由 Agent 分析畫面並執行點擊、彈窗排解或標記完成。
+        """
+        logger.info(f"🤖 [Agent 畫面探索] 啟動中... 當前步驟: 【{current_step_name}】，指示: 【{user_instruction or '自動分析'}】")
+        result = {
+            "success": False,
+            "completed": False,
+            "clicked": False,
+            "action_taken": "",
+            "decision": {}
+        }
+
+        try:
+            screenshot_bytes = self.driver.get_screenshot_as_png()
+            current_url = getattr(self.driver, "current_url", "")
+            decision = self.vision.explore_and_decide_next_step(
+                screenshot_png_bytes=screenshot_bytes,
+                current_step_name=current_step_name,
+                context_url=current_url,
+                user_instruction=user_instruction
+            )
+            result["decision"] = decision
+
+            status = decision.get("status")
+            action = decision.get("action")
+            completed = decision.get("completed", False) or status == "STEP_COMPLETED"
+            suggested_xpath = decision.get("suggested_xpath")
+            target_text = decision.get("target_text")
+
+            logger.info(f"🤖 [Agent 決策] 狀態: {status}, 動作: {action}, 描述: {decision.get('description')}")
+
+            clicked = False
+            # 1. 嘗試根據 suggested_xpath 進行點擊
+            if suggested_xpath:
+                xpaths = [xp.strip() for xp in suggested_xpath.split("|") if xp.strip()]
+                for xp in xpaths:
+                    try:
+                        elems = self.driver.find_elements(By.XPATH, xp)
+                        visible_elems = [e for e in elems if e.is_displayed()]
+                        if visible_elems:
+                            target = visible_elems[0]
+                            self.driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", target)
+                            WebDriverUtil.dispatch_click_events(self.driver, target)
+                            clicked = True
+                            result["clicked"] = True
+                            result["action_taken"] = f"成功依 Agent 建議 XPath 點擊元素: {xp}"
+                            logger.info(f"✅ Agent 成功點擊元素: {xp}")
+                            self.tracker.record_ai_action(
+                                platform=self.platform,
+                                step_id=current_step_name,
+                                step_name=current_step_name,
+                                action_type="AI_EXPLORATION_CLICK",
+                                suggested_xpath=xp,
+                                details=f"Agent 畫面探索點擊: {decision.get('description')}"
+                            )
+                            break
+                    except Exception as ex:
+                        logger.warning(f"嘗試依 XPath '{xp}' 點擊失敗: {ex}")
+
+            # 2. 若未點擊成功，嘗試以 target_text 尋找按鈕
+            if not clicked and target_text:
+                text_clean = target_text.strip()
+                text_xpath = (
+                    f"//*[contains(text(), '{text_clean}')]/ancestor::ytcp-button | "
+                    f"//*[contains(text(), '{text_clean}')]/ancestor::button | "
+                    f"//*[contains(text(), '{text_clean}')]"
+                )
+                try:
+                    elems = self.driver.find_elements(By.XPATH, text_xpath)
+                    visible_elems = [e for e in elems if e.is_displayed()]
+                    if visible_elems:
+                        target = visible_elems[0]
+                        self.driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", target)
+                        WebDriverUtil.dispatch_click_events(self.driver, target)
+                        clicked = True
+                        result["clicked"] = True
+                        result["action_taken"] = f"成功依文字標籤 '{text_clean}' 點擊元素"
+                        logger.info(f"✅ Agent 成功依文字標籤點擊: {text_clean}")
+                except Exception as ex:
+                    logger.warning(f"嘗試依文字標籤 '{text_clean}' 點擊失敗: {ex}")
+
+            if completed:
+                result["completed"] = True
+                result["success"] = True
+                if not result["action_taken"]:
+                    result["action_taken"] = "Agent 判定當前步驟已成功完成"
+                logger.info(f"🎯 Agent 判定步驟【{current_step_name}】已達成完成狀態！")
+            elif clicked:
+                result["success"] = True
+            else:
+                logger.info(f"Agent 完成畫面探索，建議狀態為: {status}")
+
+            time.sleep(1)
+            return result
+
+        except Exception as e:
+            logger.error(f"Agent 畫面探索過程發生錯誤: {e}", exc_info=True)
+            result["action_taken"] = f"探索過程異常: {e}"
+            return result
+

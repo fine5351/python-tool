@@ -26,7 +26,7 @@
         {
           "by": "xpath",
           "value": "//ytcp-quick-actions//ytcp-icon-button",
-          "weight": 72
+          "weight": 126
         },
         {
           "by": "xpath",
@@ -63,7 +63,7 @@
         {
           "by": "xpath",
           "value": "//input[@type='file']",
-          "weight": 72
+          "weight": 126
         }
       ]
     },
@@ -74,7 +74,7 @@
         {
           "by": "xpath",
           "value": "//ytcp-social-suggestions-textbox[@id='title-textarea']//div[@id='textbox']",
-          "weight": 62
+          "weight": 116
         },
         {
           "by": "xpath",
@@ -95,7 +95,7 @@
         {
           "by": "xpath",
           "value": "//ytcp-social-suggestions-textbox[@id='description-textarea']//div[@id='textbox']",
-          "weight": 66
+          "weight": 120
         },
         {
           "by": "xpath",
@@ -112,7 +112,7 @@
         {
           "by": "xpath",
           "value": "//ytcp-text-dropdown-trigger//div[contains(@class, 'right-container')]",
-          "weight": 66
+          "weight": 120
         },
         {
           "by": "xpath",
@@ -129,7 +129,7 @@
         {
           "by": "xpath",
           "value": "//ytcp-button[.//div[contains(text(), 'Done') or contains(text(), '完成')]]",
-          "weight": 66
+          "weight": 120
         }
       ]
     },
@@ -140,7 +140,7 @@
         {
           "by": "xpath",
           "value": "//tp-yt-paper-radio-button[@name='VIDEO_MADE_FOR_KIDS_NOT_MFK']",
-          "weight": 66
+          "weight": 120
         },
         {
           "by": "xpath",
@@ -156,7 +156,7 @@
         {
           "by": "xpath",
           "value": "//*[@id='next-button']",
-          "weight": 160
+          "weight": 286
         },
         {
           "by": "xpath",
@@ -177,7 +177,7 @@
         {
           "by": "xpath",
           "value": "//tp-yt-paper-radio-button[@name='PUBLIC']",
-          "weight": 60
+          "weight": 102
         },
         {
           "by": "xpath",
@@ -225,7 +225,7 @@
         {
           "by": "xpath",
           "value": "//*[@id='done-button' and .//*[contains(translate(text(), ' ', ''), '發布') or contains(text(), 'Publish') or contains(text(), '儲存') or contains(text(), 'Save')]]",
-          "weight": 56
+          "weight": 98
         },
         {
           "by": "xpath",
@@ -247,7 +247,22 @@
         {
           "by": "xpath",
           "value": "//ytcp-button[@id='close-button']",
-          "weight": 59
+          "weight": 95
+        },
+        {
+          "by": "xpath",
+          "value": "//ytcp-button[.//div[contains(text(), '關閉') or contains(text(), 'Close')]]",
+          "weight": 80
+        },
+        {
+          "by": "xpath",
+          "value": "//ytcp-video-share-dialog//ytcp-button[@id='close-button']",
+          "weight": 70
+        },
+        {
+          "by": "xpath",
+          "value": "//*[contains(text(), '影片已發布') or contains(text(), 'Video published')]/ancestor::ytcp-video-share-dialog//*[@id='close-button']",
+          "weight": 60
         },
         {
           "by": "xpath",

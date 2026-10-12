@@ -115,6 +115,83 @@ JSON 回應格式定義如下：
                 "action": "NEED_USER_INPUT"
             }
 
+    def explore_and_decide_next_step(self, screenshot_png_bytes: bytes, current_step_name: str,
+                                     context_url: str = "", user_instruction: str = "") -> Dict[str, Any]:
+        """主動探索畫面並決定下一步操作 (Agent Screen Exploration & Decision).
+
+        結合使用者介入指示與截圖分析，判斷畫面是否已完成、是否有彈窗需要關閉、或推薦點擊哪個元素以推進下一步。
+        """
+        if not self.is_available():
+            logger.warning("Gemini Vision AI 未就緒 (無 API Key)，回退至啟發式判斷模式。")
+            return {
+                "available": False,
+                "status": "HEURISTIC_MODE",
+                "action": "CLICK_ELEMENT",
+                "description": "Vision AI 未就緒，依啟發式規則建議尋找畫面上之『關閉』或『確認』按鈕",
+                "target_text": "關閉",
+                "suggested_xpath": "//ytcp-button[@id='close-button'] | //*[contains(text(), '關閉')]/ancestor::ytcp-button | //*[contains(text(), '關閉')]",
+                "completed": False
+            }
+
+        instruction_text = f"\n使用者額外介入指示：【{user_instruction}】" if user_instruction else ""
+
+        prompt = f"""
+你是一個具備全方位畫面決策能力的自動化 RPA Agent。
+當前自動化流程在執行【{current_step_name}】時疑似停滯或卡住，使用者呼叫了你進行畫面探索與決策。
+網址背景：{context_url}{instruction_text}
+
+請仔細審視當前網頁截圖，回答以下核心問題並制定下一步行動方案：
+1. 當前畫面是否已經顯示成功完成的標誌（例如「影片已發布」、「上傳完成」、「發布成功」對話框）？
+2. 是否有干擾彈窗、完成對話框、關閉按鈕（例如右下角『關閉』、右上角『X』）或確認按鈕需要點擊？
+3. 根據使用者指示與畫面現狀，下一步最合理的自動化操作是什麼？
+
+請嚴格以 JSON 格式回應，不要包含任何 markdown 標籤或額外文字：
+{{
+  "status": "STEP_COMPLETED" | "CLICK_ACTION" | "POPUP_DETECTED" | "WAIT_MORE" | "MANUAL_ACTION_NEEDED",
+  "description": "簡潔明確地說明你在畫面上看到了什麼、判斷的依據",
+  "action": "CLICK_ELEMENT" | "MARK_COMPLETED" | "WAIT" | "NEED_USER_INPUT",
+  "target_text": "若需要點擊元素，請提供該按鈕或標籤的精確文字（例如：'關閉'、'知道了'、'發布'）",
+  "suggested_xpath": "若可推導出 XPath 則提供，若多種可能可用 '|' 連接",
+  "completed": true 或 false (若畫面表明發布或步驟已達成目標，請設為 true),
+  "confidence": 0.0 到 1.0 的信心度數值,
+  "next_step_recommendation": "給自動化程式的下一步具體建議"
+}}
+"""
+
+        try:
+            response_text = ""
+            if hasattr(self.client, "models"):
+                from google.genai import types
+                response = self.client.models.generate_content(
+                    model=self.model_name,
+                    contents=[
+                        types.Part.from_bytes(data=screenshot_png_bytes, mime_type="image/png"),
+                        prompt
+                    ]
+                )
+                response_text = response.text or ""
+            else:
+                import io
+                from PIL import Image
+                img = Image.open(io.BytesIO(screenshot_png_bytes))
+                response = self.client.generate_content([prompt, img])
+                response_text = response.text or ""
+
+            cleaned = self._clean_json_output(response_text)
+            result = json.loads(cleaned)
+            result["available"] = True
+            logger.info(f"Agent Screen Exploration Decision: {result.get('status')} - {result.get('description')} (action: {result.get('action')})")
+            return result
+        except Exception as e:
+            logger.error(f"Error during Agent screen exploration: {e}", exc_info=True)
+            return {
+                "available": True,
+                "status": "ERROR_STATE",
+                "action": "NEED_USER_INPUT",
+                "description": f"畫面分析時發生錯誤: {e}",
+                "completed": False
+            }
+
     @staticmethod
     def _clean_json_output(raw_text: str) -> str:
         text = raw_text.strip()
@@ -126,3 +203,4 @@ JSON 回應格式定義如下：
         if text.endswith("```"):
             text = text[:-3]
         return text.strip()
+

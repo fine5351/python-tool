@@ -9,7 +9,7 @@
         {
           "by": "xpath",
           "value": "//input[@type='file']",
-          "weight": 70
+          "weight": 124
         }
       ]
     },
@@ -20,7 +20,7 @@
         {
           "by": "xpath",
           "value": "//input[contains(@placeholder, '填写标题') or contains(@placeholder, '標題')]",
-          "weight": 70
+          "weight": 124
         },
         {
           "by": "xpath",
@@ -36,7 +36,7 @@
         {
           "by": "xpath",
           "value": "//div[contains(@class, 'tiptap') and contains(@class, 'ProseMirror') and @contenteditable='true']",
-          "weight": 70
+          "weight": 124
         },
         {
           "by": "xpath",
@@ -57,7 +57,7 @@
         {
           "by": "xpath",
           "value": "//xhs-publish-btn",
-          "weight": 67
+          "weight": 115
         },
         {
           "by": "xpath",
@@ -99,7 +99,7 @@
         {
           "by": "xpath",
           "value": "//*[contains(text(), '发布成功') or contains(text(), 'Publish success')]",
-          "weight": 55
+          "weight": 101
         },
         {
           "by": "xpath",
