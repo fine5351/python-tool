@@ -5,6 +5,10 @@ import tempfile
 import unittest
 from pathlib import Path
 
+_src_dir = Path(__file__).resolve().parents[1] / "src"
+if str(_src_dir) not in sys.path:
+    sys.path.insert(0, str(_src_dir))
+
 from video_editor.cli import main, parse_args
 from video_editor.config import EditorConfig, clean_path
 

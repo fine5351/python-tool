@@ -1,17 +1,17 @@
-"""命令列介面入口模組。"""
+"""命令列介面入口模組（支援三級 AI 模型配置與對話式剪輯重組）。"""
 
 import argparse
 import sys
 from pathlib import Path
 
-from video_editor.config import EditorConfig, clean_path
+from video_editor.config import EditorConfig, ModelConfig, clean_path
 from video_editor.pipeline import VideoEditorPipeline
 
 
 def parse_args(args=None) -> argparse.Namespace:
     """解析終端機命令列引數。"""
     parser = argparse.ArgumentParser(
-        description="長篇遊戲劇情影片智慧剪輯工具（結合 FFmpeg 與 AGY AI 多模態）"
+        description="通用型 AI 對話式影片智慧剪輯、重組與無損匯出工具（結合 FFmpeg 與 AGY 多模態分流）"
     )
 
     parser.add_argument(
@@ -19,26 +19,74 @@ def parse_args(args=None) -> argparse.Namespace:
         "--input",
         type=clean_path,
         required=True,
-        help="輸入的長影片檔案路徑 (例如: input.mp4)",
+        help="輸入的影片檔案路徑 (例如: input.mp4)",
     )
     parser.add_argument(
         "-o",
         "--output",
         type=clean_path,
         default=Path("output_parts"),
-        help="切片輸出目錄 (預設: output_parts)",
+        help="影片輸出目錄 (預設: output_parts)",
     )
+    parser.add_argument(
+        "--export-mode",
+        type=str,
+        choices=["episodes", "single", "clips"],
+        default="episodes",
+        help="匯出模式: episodes (無縫拼接並按時長分集) | single (合併為單一完整檔) | clips (各保留段獨立輸出)",
+    )
+    parser.add_argument(
+        "-p",
+        "--prompt",
+        type=str,
+        default="",
+        help="啟動時自動套用的初始自然語言剪輯指令 (例如: '刪除重打失敗過程，只留最後通關並匯出單一檔')",
+    )
+    parser.add_argument(
+        "--plan-file",
+        type=clean_path,
+        default=None,
+        help="指定載入或儲存剪輯計畫 JSON 的路徑 (若檔案已存在將直接載入免重跑初始掃描)",
+    )
+    parser.add_argument(
+        "-y",
+        "--yes",
+        action="store_true",
+        help="完成初始 AI 規劃後自動確認並匯出，跳過終端機互動對話等待",
+    )
+
+    # AI 工作職責三級模型配置參數
+    parser.add_argument(
+        "--model-vision-fast",
+        type=str,
+        default="flash_lite",
+        help="基礎視覺快篩與場景摘要模型 (預設: flash_lite)",
+    )
+    parser.add_argument(
+        "--model-vision-deep",
+        type=str,
+        default="flash",
+        help="深度視覺探勘與區間密集細掃模型 (預設: flash)",
+    )
+    parser.add_argument(
+        "--model-planner",
+        type=str,
+        default="pro",
+        help="自然語言對話推理與非線性時間軸重組模型 (預設: pro)",
+    )
+
+    # 時間軸與特徵門檻參數
     parser.add_argument(
         "--min-part",
         type=float,
         default=20.0,
-        help="每集目標最短時長 (分鐘，預設: 20)",
+        help="episodes 模式下每集目標最短時長 (分鐘，預設: 20)",
     )
     parser.add_argument(
         "--max-part",
         type=float,
         default=30.0,
-        help="每集目標最長時長 (分鐘，預設: 30)",
+        help="episodes 模式下每集目標最長時長 (分鐘，預設: 30)",
     )
     parser.add_argument(
         "--freeze-threshold",
@@ -90,14 +138,9 @@ def parse_args(args=None) -> argparse.Namespace:
         help="白畫面佔比門檻 (預設: 0.98)",
     )
     parser.add_argument(
-        "--no-ai",
-        action="store_true",
-        help="停用 AI 多模態審查，直接依照特徵閾值切片",
-    )
-    parser.add_argument(
         "--dry-run",
         action="store_true",
-        help="僅進行特徵分析與切點規劃，不實際輸出分割影片檔",
+        help="僅進行場景分析、互動規劃與模擬，不實際寫入分割影片檔",
     )
     parser.add_argument(
         "--ffmpeg-path",
@@ -121,7 +164,7 @@ def parse_args(args=None) -> argparse.Namespace:
         "--temp-dir",
         type=clean_path,
         default=None,
-        help="暫存影格圖片目錄 (預設: 專案目錄下之 temp_frames)",
+        help="暫存影格圖片與 concat 清單目錄 (預設: 專案目錄下之 temp_frames)",
     )
     parser.add_argument(
         "--keep-temp",
@@ -148,9 +191,20 @@ def main() -> None:
             print(f"錯誤：無法建立輸出目錄 '{args.output}' ({err})", file=sys.stderr)
             sys.exit(1)
 
+    models_cfg = ModelConfig(
+        fast_vision=args.model_vision_fast,
+        deep_vision=args.model_vision_deep,
+        planner=args.model_planner,
+    )
+
     config_kwargs = {
         "video_path": args.input,
         "output_dir": args.output,
+        "plan_file": args.plan_file,
+        "models": models_cfg,
+        "export_mode": args.export_mode,
+        "initial_prompt": args.prompt,
+        "auto_confirm": args.yes,
         "min_freeze_duration": args.freeze_threshold,
         "target_min_part_len": args.min_part * 60.0,
         "target_max_part_len": args.max_part * 60.0,
@@ -164,7 +218,6 @@ def main() -> None:
         "ffmpeg_bin": args.ffmpeg_path,
         "ffprobe_bin": args.ffprobe_path,
         "agy_bin": args.agy_path,
-        "enable_ai": not args.no_ai,
         "dry_run": args.dry_run,
         "keep_temp": args.keep_temp,
     }
