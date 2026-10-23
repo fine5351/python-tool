@@ -75,11 +75,96 @@ class EditPlan:
     export_mode: str = "episodes"
     target_min_part_len: float = 20.0 * 60.0
     target_max_part_len: float = 30.0 * 60.0
+    _id_mappings: Dict[int, int] = field(default_factory=dict, init=False, repr=False)
 
     def __post_init__(self) -> None:
         """若未指定輸出序列，預設依段落初始順序排列。"""
         if not self.sequence and self.segments:
             self.sequence = [seg.id for seg in self.segments]
+
+    def resolve_id(self, seg_id: int) -> int:
+        """解析經合併後的最終段落 ID（處理鏈式映射）。"""
+        curr = int(seg_id)
+        visited = set()
+        while curr in self._id_mappings and curr not in visited:
+            visited.add(curr)
+            curr = self._id_mappings[curr]
+        return curr
+
+    def merge_segments(
+        self, segment_ids: List[int], summary: Optional[str] = None
+    ) -> TimelineSegment:
+        """將多個相鄰的有效段落整合為單一段落，沿用首段 ID 並記錄 ID 映射。"""
+        if not segment_ids or len(segment_ids) < 2:
+            raise ValueError("合併操作至少需要指定 2 個段落 ID")
+
+        resolved_ids = list(dict.fromkeys(self.resolve_id(int(sid)) for sid in segment_ids))
+        if len(resolved_ids) < 2:
+            raise ValueError("經 ID 映射後，欲合併的有效段落少於 2 個")
+
+        target_segs = [self.get_segment(sid) for sid in resolved_ids]
+        if any(s is None for s in target_segs):
+            missing = [sid for sid, s in zip(resolved_ids, target_segs) if s is None]
+            raise ValueError(f"找不到要合併的段落 ID: {missing}")
+
+        sorted_segs = sorted(target_segs, key=lambda s: s.start)
+
+        for i in range(len(sorted_segs) - 1):
+            gap = sorted_segs[i + 1].start - sorted_segs[i].end
+            if gap > 1.0 or gap < -1.0:
+                raise ValueError(
+                    f"段落 #{sorted_segs[i].id} ({sorted_segs[i].end:.1f}s) 與 "
+                    f"#{sorted_segs[i + 1].id} ({sorted_segs[i + 1].start:.1f}s) 不相鄰（間隙 {gap:.1f}s > 1.0s），無法合併"
+                )
+
+        first_seg = sorted_segs[0]
+        first_id = first_seg.id
+        first_seg.end = sorted_segs[-1].end
+        first_seg.keep = True
+
+        merged_tags: List[str] = []
+        for s in sorted_segs:
+            for t in s.tags:
+                if t not in merged_tags:
+                    merged_tags.append(t)
+        first_seg.tags = merged_tags
+
+        if summary is not None and summary.strip():
+            first_seg.summary = summary.strip()
+        else:
+            summaries = [s.summary for s in sorted_segs if s.summary and s.summary.strip()]
+            first_seg.summary = " + ".join(summaries) if summaries else first_seg.summary
+
+        for other_seg in sorted_segs[1:]:
+            self._id_mappings[other_seg.id] = first_id
+            if other_seg in self.segments:
+                self.segments.remove(other_seg)
+
+        new_seq: List[int] = []
+        for sid in self.sequence:
+            res_id = self.resolve_id(sid)
+            if self.get_segment(res_id) is not None and res_id not in new_seq:
+                new_seq.append(res_id)
+        self.sequence = new_seq
+
+        return first_seg
+
+    def keep_only(self, segment_ids: List[int]) -> List[int]:
+        """僅保留指定的段落（其餘段落設為 keep=False），並同步更新 sequence。"""
+        resolved_targets = {self.resolve_id(int(sid)) for sid in segment_ids}
+        valid_targets = {sid for sid in resolved_targets if self.get_segment(sid) is not None}
+
+        for seg in self.segments:
+            seg.keep = (seg.id in valid_targets)
+
+        new_seq = [sid for sid in self.sequence if self.resolve_id(sid) in valid_targets]
+        dedup_seq = list(dict.fromkeys(new_seq))
+        for tid in valid_targets:
+            if tid not in dedup_seq:
+                dedup_seq.append(tid)
+        self.sequence = dedup_seq
+
+        return [seg.id for seg in self.segments if seg.keep]
 
     def _next_id(self) -> int:
         """產生下一個唯一段落編號。"""
@@ -357,10 +442,25 @@ class EditPlan:
         for op_data in operations:
             op_type = str(op_data.get("op", "")).strip().lower()
             try:
-                if op_type in ("keep", "drop", "set_keep"):
-                    ids = [int(x) for x in op_data.get("segment_ids", [])]
+                if op_type == "merge":
+                    raw_ids = [int(x) for x in op_data.get("segment_ids", [])]
+                    merged_seg = self.merge_segments(raw_ids, summary=op_data.get("summary"))
+                    logs.append(
+                        f"已將段落 {raw_ids} 合併為段落 #{merged_seg.id} "
+                        f"({format_timestamp(merged_seg.start)} ~ {format_timestamp(merged_seg.end)})"
+                    )
+
+                elif op_type in ("keep_only", "only_keep"):
+                    raw_ids = [int(x) for x in op_data.get("segment_ids", [])]
                     if "segment_id" in op_data and op_data["segment_id"] is not None:
-                        ids.append(int(op_data["segment_id"]))
+                        raw_ids.append(int(op_data["segment_id"]))
+                    kept = self.keep_only(raw_ids)
+                    logs.append(f"已將剪輯計畫設為僅保留段落 {kept}")
+
+                elif op_type in ("keep", "drop", "set_keep"):
+                    ids = [self.resolve_id(int(x)) for x in op_data.get("segment_ids", [])]
+                    if "segment_id" in op_data and op_data["segment_id"] is not None:
+                        ids.append(self.resolve_id(int(op_data["segment_id"])))
                     keep_val = (
                         True
                         if op_type == "keep"
@@ -375,7 +475,7 @@ class EditPlan:
                     logs.append(f"已將段落 {updated} 設為【{action_str}】")
 
                 elif op_type == "split":
-                    sid = int(op_data["segment_id"])
+                    sid = self.resolve_id(int(op_data["segment_id"]))
                     cut_t = float(op_data["cut_time"])
                     left_s, right_s = self.split_segment(
                         seg_id=sid,
@@ -390,7 +490,7 @@ class EditPlan:
                     )
 
                 elif op_type == "trim":
-                    sid = int(op_data["segment_id"])
+                    sid = self.resolve_id(int(op_data["segment_id"]))
                     seg = self.trim_segment(
                         seg_id=sid,
                         new_start=op_data.get("new_start"),
@@ -402,7 +502,7 @@ class EditPlan:
                     )
 
                 elif op_type == "reorder":
-                    seq = [int(x) for x in op_data.get("sequence", [])]
+                    seq = [self.resolve_id(int(x)) for x in op_data.get("sequence", [])]
                     only_listed = bool(op_data.get("only_keep_listed", False))
                     new_seq = self.reorder(seq, only_keep_listed=only_listed)
                     logs.append(f"已更新段落匯出順序為: {new_seq}")
@@ -414,8 +514,12 @@ class EditPlan:
                     self.set_export_mode(mode, min_minutes=min_m, max_minutes=max_m)
                     logs.append(f"已切換匯出模式為: {self.export_mode}")
 
+                elif op_type in ("set_output", "output"):
+                    out_path = op_data.get("output_path", "")
+                    logs.append(f"設定輸出目標為: {out_path}")
+
                 elif op_type == "update_summary":
-                    sid = int(op_data["segment_id"])
+                    sid = self.resolve_id(int(op_data["segment_id"]))
                     seg = self.get_segment(sid)
                     if seg is not None:
                         if "summary" in op_data:

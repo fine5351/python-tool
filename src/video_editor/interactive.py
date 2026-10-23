@@ -2,7 +2,7 @@
 
 from typing import Callable, Optional
 
-from video_editor.config import EditorConfig
+from video_editor.config import EditorConfig, clean_path
 from video_editor.models import EditPlan, format_timestamp
 from video_editor.verifier import AIVerifier
 
@@ -38,6 +38,11 @@ class InteractiveSession:
                 if plan.export_mode == "episodes"
                 else ""
             ),
+            (
+                f"🎯 輸出目標檔案: {self.config.output_file}"
+                if self.config.output_file is not None
+                else f"🎯 輸出目標目錄: {self.config.output_dir}"
+            ),
             "-" * 78,
             "段落清單 (Segments):",
         ]
@@ -70,6 +75,29 @@ class InteractiveSession:
         )
         return "\n".join(lines)
 
+    def _update_output_path(self, raw_path: str) -> None:
+        """動態更新輸出檔案或目錄路徑，並確保環境安全可用。"""
+        target = clean_path(raw_path)
+        video_exts = {".mp4", ".mkv", ".mov", ".avi", ".webm", ".ts"}
+        if target.suffix.lower() in video_exts:
+            self.config.output_file = target
+            self.config.output_dir = target.parent
+        else:
+            self.config.output_file = None
+            self.config.output_dir = target
+
+        if self.config.output_file is not None:
+            try:
+                if self.config.output_file.is_dir() and not any(self.config.output_file.iterdir()):
+                    self.config.output_file.rmdir()
+            except (OSError, PermissionError):
+                pass
+
+        try:
+            self.config.output_dir.mkdir(parents=True, exist_ok=True)
+        except Exception as err:
+            print(f"⚠ 無法建立輸出目錄: {err}")
+
     def apply_user_instruction(self, plan: EditPlan, instruction: str) -> None:
         """透過 AI 規劃器解析單句自然語言指令，必要時觸發區間細掃並更新計畫。"""
         decision = self.verifier.plan_edits_from_dialogue(plan, instruction)
@@ -99,6 +127,14 @@ class InteractiveSession:
 
         ops = decision.get("operations")
         if isinstance(ops, list) and ops:
+            for op_data in ops:
+                if str(op_data.get("op", "")).lower() in ("set_output", "output"):
+                    out_p = op_data.get("output_path")
+                    if out_p:
+                        self._update_output_path(str(out_p))
+                        target_desc = self.config.output_file or self.config.output_dir
+                        print(f"  ✔ 輸出目標已更新為: '{target_desc}'")
+
             logs = plan.apply_operations(ops)
             for log_line in logs:
                 print(f"  ✔ {log_line}")
@@ -106,7 +142,7 @@ class InteractiveSession:
         plan.save(self.config.resolved_plan_file)
 
     def handle_slash_command(self, cmd_line: str) -> bool:
-        """處理內建斜線指令（如 /models 與 /model <role> <name>）。"""
+        """處理內建斜線指令（如 /models、/model、/output、/input）。"""
         parts = cmd_line.strip().split()
         if not parts:
             return False
@@ -137,11 +173,36 @@ class InteractiveSession:
                 print(f"⚠ {err}")
             return True
 
+        if head == "/output":
+            if len(parts) < 2:
+                target_desc = self.config.output_file or self.config.output_dir
+                print(f"🎯 目前輸出目標為: {target_desc}\n💡 用法: `/output <檔案或目錄路徑>`")
+                return True
+            raw_p = " ".join(parts[1:])
+            self._update_output_path(raw_p)
+            target_desc = self.config.output_file or self.config.output_dir
+            print(f"✔ 輸出目標已更新為: '{target_desc}'")
+            return True
+
+        if head == "/input":
+            if len(parts) < 2:
+                print(f"🎬 目前輸入影片為: {self.config.video_path}\n💡 用法: `/input <影片檔案路徑>`")
+                return True
+            raw_p = clean_path(" ".join(parts[1:]))
+            if not raw_p.exists():
+                print(f"⚠ 找不到影片檔案: '{raw_p}'")
+                return True
+            self.config.video_path = raw_p
+            print(f"✔ 輸入影片已更新為: '{raw_p}'")
+            return True
+
         if head == "/help":
             print(
                 "\n📖 互動剪輯指令說明：\n"
-                "  - 直接輸入自然語言：例如「刪掉段落 2 和 3，把段落 4 移到最前面並匯出成單一檔」\n"
+                "  - 直接輸入自然語言：例如「將 #4、#5 整合為一個段落, 只輸出這個整合後的段落」\n"
                 "  - 局部放大細掃：例如「幫我細掃 10:00 到 20:00 之間每次重打或切換場景的地方」\n"
+                "  - `/output <路徑>`：檢視或動態更改影片輸出檔案或目錄路徑\n"
+                "  - `/input <路徑>`：檢視或更換欲剪輯的來源影片\n"
                 "  - `/models`：檢視目前三個工作職責配置的 AI 模型\n"
                 "  - `/model <role> <name>`：即時切換指定職責的模型 (role: fast_vision, deep_vision, planner)\n"
                 "  - `export` / `y`：確認當前計畫並開始無損匯出影片\n"

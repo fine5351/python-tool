@@ -24,16 +24,18 @@ class AIVerifier:
         image_path: Optional[Path] = None,
         role: str = "fast_vision",
     ) -> List[str]:
-        """根據工作職責組裝 AGY CLI 指令與對應的 --model 參數。"""
-        model_name = self.config.models.get_model(role)
+        """根據工作職責組裝 AGY CLI 指令與對應的合法模型名稱。"""
+        cli_model = self.config.models.resolve_cli_model(role)
+        final_prompt = prompt
         cmd = [
             self.config.agy_bin,
-            "ask",
-            f"--model={model_name}",
+            "-p",
         ]
         if image_path is not None:
-            cmd.append(f"--image={str(image_path)}")
-        cmd.append(prompt)
+            cmd.extend(["--add-dir", str(image_path.parent.resolve())])
+            final_prompt = f"請讀取並分析圖片檔案: {str(image_path.resolve())}\n\n{prompt}"
+        cmd.append(final_prompt)
+        cmd.append(f"--model={cli_model}")
         return cmd
 
     def _query_agy_text(
@@ -55,11 +57,17 @@ class AIVerifier:
                 errors="replace",
                 timeout=timeout,
             )
+            if result.returncode != 0:
+                err_out = (result.stderr or result.stdout or "").strip()
+                err_msg = err_out.splitlines()[0] if err_out else f"code {result.returncode}"
+                cli_model = self.config.models.resolve_cli_model(role)
+                print(f"  [AI 呼叫警告] agy 查詢未成功 (model={cli_model}): {err_msg}")
+                return ""
             return result.stdout.strip()
         except (subprocess.SubprocessError, FileNotFoundError) as err:
-            model_name = self.config.models.get_model(role)
+            cli_model = self.config.models.resolve_cli_model(role)
             print(
-                f"  [AI 呼叫警告] 無法透過 '{self.config.agy_bin}' (role={role}, model={model_name}) 查詢 ({err})。"
+                f"  [AI 呼叫警告] 無法透過 '{self.config.agy_bin}' (role={role}, model={cli_model}) 查詢 ({err})。"
             )
             return ""
 
@@ -557,12 +565,15 @@ class AIVerifier:
             f"使用者的最新指令為：『{user_instruction}』\n\n"
             "你可以透過兩種方式回應使用者需求：\n"
             "1. 若現有段落資訊已足夠，請在 `operations` 陣列中輸出對應的時間軸操作指令，支援的操作格式包含：\n"
+            '   - 合併相鄰段落: `{"op": "merge", "segment_ids": [4, 5], "summary": "整合後的段落摘要"}`\n'
+            '   - 僅保留指定段落: `{"op": "keep_only", "segment_ids": [4]}`\n'
             '   - 保留段落: `{"op": "keep", "segment_ids": [1, 2]}`\n'
             '   - 刪除段落: `{"op": "drop", "segment_ids": [3, 4]}`\n'
             '   - 切分段落: `{"op": "split", "segment_id": 2, "cut_time": 150.0, "left_summary": "...", "right_summary": "...", "left_keep": false, "right_keep": true}`\n'
             '   - 修剪段落: `{"op": "trim", "segment_id": 1, "new_start": 10.0, "new_end": 120.0, "summary": "..."}`\n'
             '   - 重排匯出順序: `{"op": "reorder", "sequence": [5, 1, 2], "only_keep_listed": false}`\n'
             '   - 切換匯出模式: `{"op": "set_export", "mode": "single" | "episodes" | "clips", "min_minutes": 20, "max_minutes": 30}`\n'
+            '   - 設定輸出目標: `{"op": "set_output", "output_path": "路徑/目標檔名.mp4"}`\n'
             '   - 更新段落摘要: `{"op": "update_summary", "segment_id": 1, "summary": "...", "tags": ["..."]}`\n'
             "2. 若使用者要求針對某段時間範圍細看畫面（或現有段落太粗、需要先看圖找出切點），請在 `inspect_range` 填入：\n"
             '   `{"start": 起始秒數, "end": 結束秒數, "query": "要尋找或區分的畫面重點", "sample_count": 8}`\n\n'
@@ -581,7 +592,7 @@ class AIVerifier:
             timeout=90,
         )
         parsed = self._extract_json(reply_text)
-        if isinstance(parsed, dict):
+        if isinstance(parsed, dict) and (parsed.get("operations") or parsed.get("inspect_range")):
             return {
                 "reply": str(parsed.get("reply", "已根據您的指令更新剪輯計畫。")),
                 "inspect_range": parsed.get("inspect_range"),
@@ -592,8 +603,94 @@ class AIVerifier:
                 ),
             }
 
+        # 本地端規則保底解析
+        fallback = self._fallback_parse_dialogue(plan, user_instruction)
+        if fallback is not None:
+            return fallback
+
         return {
             "reply": "無法自動解析 AI 規劃回應，請嘗試明確指定段落編號或秒數（例如：刪除段落 2、或細掃 10:00~20:00）。",
             "inspect_range": None,
             "operations": [],
         }
+
+    def _fallback_parse_dialogue(
+        self, plan: EditPlan, user_instruction: str
+    ) -> Optional[Dict[str, Any]]:
+        """本地端啟發式自然語言規則保底解析（當外部 AI CLI 呼叫失敗時使用）。"""
+        text = user_instruction.strip()
+        operations: List[Dict[str, Any]] = []
+        replies: List[str] = []
+
+        # 1. 輸出路徑指令判定 (例如: 輸出檔案設為 "path/to/video.mp4")
+        out_match = re.search(
+            r"(?:輸出檔案|輸出路徑|輸出至|輸出目標)(?:設為|為|到|[:：])\s*([\"']?([^\"'\r\n]+)[\"']?)",
+            text,
+        )
+        if out_match:
+            raw_out_path = out_match.group(2).strip()
+            operations.append({"op": "set_output", "output_path": raw_out_path})
+            replies.append(f"設定輸出路徑為 '{raw_out_path}'")
+
+        # 2. 匯出模式判定 (例如: 匯出成單一檔、切換為單檔、single)
+        if any(kw in text for kw in ("單一檔", "單檔", "合併為單一", "single")):
+            operations.append({"op": "set_export", "mode": "single"})
+            replies.append("切換匯出模式為單一完整檔 (single)")
+        elif any(kw in text for kw in ("分集", "episodes")):
+            operations.append({"op": "set_export", "mode": "episodes"})
+            replies.append("切換匯出模式為分集 (episodes)")
+        elif any(kw in text for kw in ("各段獨立", "片段", "clips")):
+            operations.append({"op": "set_export", "mode": "clips"})
+            replies.append("切換匯出模式為各段獨立輸出 (clips)")
+
+        # 3. 提取所有段落編號 (例如: #4, #5, 段落 4, 段落5, ID 4)
+        found_ids: List[int] = []
+        for match in re.finditer(r"(?:#|段落\s*|段\s*|id\s*)?(\d+)", text, re.IGNORECASE):
+            val = int(match.group(1))
+            if any(seg.id == val for seg in plan.segments) or val <= len(plan.segments) + 5:
+                if val not in found_ids:
+                    found_ids.append(val)
+
+        is_merge = any(kw in text for kw in ("整合", "合併", "接合", "連起來", "merge"))
+        is_only_keep = any(
+            kw in text
+            for kw in ("只輸出", "只保留", "僅保留", "只留", "只要", "僅輸出", "only")
+        )
+        is_drop = any(kw in text for kw in ("刪除", "刪掉", "移除", "不要", "drop", "delete"))
+        is_keep = (
+            any(kw in text for kw in ("保留", "留下", "keep"))
+            and not is_only_keep
+            and not is_drop
+        )
+
+        if is_merge and len(found_ids) >= 2:
+            merge_targets = found_ids[:2] if len(found_ids) == 2 else found_ids
+            operations.append({"op": "merge", "segment_ids": merge_targets})
+            replies.append(f"將段落 {merge_targets} 合併為單一段落")
+
+            if is_only_keep:
+                first_id = sorted(merge_targets)[0]
+                operations.append({"op": "keep_only", "segment_ids": [first_id]})
+                replies.append(f"並設定為僅輸出該整合後的段落 #{first_id}")
+
+        elif is_only_keep and found_ids:
+            operations.append({"op": "keep_only", "segment_ids": found_ids})
+            replies.append(f"設定為僅保留段落 {found_ids}")
+
+        elif is_drop and found_ids:
+            operations.append({"op": "drop", "segment_ids": found_ids})
+            replies.append(f"將段落 {found_ids} 設為刪除")
+
+        elif is_keep and found_ids:
+            operations.append({"op": "keep", "segment_ids": found_ids})
+            replies.append(f"將段落 {found_ids} 設為保留")
+
+        if operations:
+            reply_msg = "已依指令完成規劃：" + "，".join(replies) + "。"
+            return {
+                "reply": reply_msg,
+                "inspect_range": None,
+                "operations": operations,
+            }
+
+        return None

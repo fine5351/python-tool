@@ -59,10 +59,13 @@ class VideoEditorPipeline:
             confirmed_cuts: List[float] = []
             silences: List[Tuple[float, float]] = []
 
-            # 若指定了既有計畫檔且存在，可直接載入免重跑初始 AI 場景索引
             if self.config.plan_file is not None and self.config.plan_file.is_file():
                 print(f"ℹ 載入既有剪輯計畫檔: '{self.config.plan_file}'")
                 plan = EditPlan.load(self.config.plan_file)
+                confirmed_cuts = sorted({seg.end for seg in plan.segments[:-1]})
+            elif self.config.resolved_plan_file.is_file():
+                print(f"ℹ 載入既有剪輯計畫檔: '{self.config.resolved_plan_file}'")
+                plan = EditPlan.load(self.config.resolved_plan_file)
                 confirmed_cuts = sorted({seg.end for seg in plan.segments[:-1]})
             else:
                 # Stage 1: 快速特徵掃描 + AI 通用場景索引建立

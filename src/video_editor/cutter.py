@@ -415,14 +415,24 @@ class VideoCutter:
             total_sec = sum(e - s for s, e in group)
             duration_min = total_sec / 60.0
 
-            if plan.export_mode == "single" and len(export_groups) == 1:
-                filename = f"{base_name}-edited{extension}"
-            elif plan.export_mode == "clips":
-                filename = f"{base_name}-clip-{idx}{extension}"
+            if self.config.output_file is not None:
+                if len(export_groups) == 1:
+                    out_path = self.config.output_file
+                    filename = out_path.name
+                else:
+                    out_stem = self.config.output_file.stem
+                    out_suffix = self.config.output_file.suffix or extension
+                    filename = f"{out_stem}-{idx}{out_suffix}"
+                    out_path = self.config.output_dir / filename
             else:
-                filename = f"{base_name}-{idx}{extension}"
+                if plan.export_mode == "single" and len(export_groups) == 1:
+                    filename = f"{base_name}-edited{extension}"
+                elif plan.export_mode == "clips":
+                    filename = f"{base_name}-clip-{idx}{extension}"
+                else:
+                    filename = f"{base_name}-{idx}{extension}"
 
-            out_path = self.config.output_dir / filename
+                out_path = self.config.output_dir / filename
             output_files.append(out_path)
 
             ranges_desc = " + ".join(

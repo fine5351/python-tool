@@ -9,8 +9,15 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
 
 def clean_path(val: Union[str, Path]) -> Path:
-    """清理路徑（自動去除兩側多餘空白與 Windows 命令列轉義殘留之引號）。"""
-    cleaned = str(val).strip().strip('"\'').strip()
+    """清理路徑（自動去除兩側多餘空白、BOM/隱藏字元與 Windows 命令列轉義殘留之引號）。"""
+    cleaned = (
+        str(val)
+        .strip()
+        .strip("\ufeff\u200b\u200c\u200d\u200e\u200f\u202a\u202b\u202c\u202d\u202e")
+        .strip()
+        .strip("\"'")
+        .strip()
+    )
     return Path(cleaned)
 
 
@@ -63,6 +70,25 @@ class ModelConfig:
         setattr(self, norm_role, cleaned_model)
         return norm_role
 
+    CLI_MODEL_MAP: Dict[str, str] = field(
+        default_factory=lambda: {
+            "flash_lite": "gemini-3.8-flash-low",
+            "flash": "gemini-3.8-flash-medium",
+            "pro": "gemini-4-argon-medium",
+        },
+        init=False,
+        repr=False,
+    )
+
+    def resolve_cli_model(self, role: str) -> str:
+        """將工作職責或模型簡稱映射為本機 agy 支援之合法模型名稱。"""
+        try:
+            model_name = self.get_model(role)
+        except ValueError:
+            model_name = role
+        cleaned = model_name.strip()
+        return self.CLI_MODEL_MAP.get(cleaned.lower(), cleaned)
+
     def to_dict(self) -> Dict[str, str]:
         """轉為字典結構供序列化儲存。"""
         return {
@@ -87,6 +113,7 @@ class EditorConfig:
 
     video_path: Path
     output_dir: Path = field(default_factory=lambda: Path("output_parts"))
+    output_file: Optional[Path] = None
     temp_dir: Path = field(default_factory=lambda: PROJECT_ROOT / "temp_frames")
     plan_file: Optional[Path] = None
 
@@ -144,6 +171,30 @@ class EditorConfig:
 
         if self.plan_file is not None:
             self.plan_file = clean_path(self.plan_file)
+
+        # 支援直接指定 .mp4 等影片檔案作為輸出目標
+        video_extensions = {".mp4", ".mkv", ".mov", ".avi", ".webm", ".ts"}
+        if self.output_file is not None:
+            self.output_file = clean_path(self.output_file)
+            self.output_dir = self.output_file.parent
+        elif self.output_dir.suffix.lower() in video_extensions:
+            self.output_file = self.output_dir
+            self.output_dir = self.output_dir.parent
+
+        # 若輸出檔案路徑先前曾被誤建為目錄，安全搬移其中的計畫 json 並清理移除該目錄以便寫入檔案
+        if self.output_file is not None and self.output_file.is_dir():
+            try:
+                for child in list(self.output_file.iterdir()):
+                    if child.is_file() and child.name.endswith(".json"):
+                        dest = self.output_dir / child.name
+                        if not dest.exists():
+                            child.rename(dest)
+                        else:
+                            child.unlink()
+                if not any(self.output_file.iterdir()):
+                    self.output_file.rmdir()
+            except (OSError, PermissionError):
+                pass
 
         valid_modes = ("episodes", "single", "clips")
         if self.export_mode not in valid_modes:

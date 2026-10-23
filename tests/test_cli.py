@@ -127,5 +127,48 @@ class TestCLI(unittest.TestCase):
             self.assertTrue(expected_output_dir.is_dir())
 
 
+    def test_parse_args_optional_input_and_output(self):
+        """測試 -i 與 -o 成為選填引數（預設為 None）。"""
+        args = parse_args([])
+        self.assertIsNone(args.input)
+        self.assertIsNone(args.output)
+
+    def test_editor_config_handles_mp4_output_file_and_cleans_empty_dir(self):
+        """測試指定 .mp4 影片檔案路徑時，EditorConfig 會正確設定 output_file 並清理誤建之空目錄。"""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_path = Path(tmp_dir)
+            fake_video = tmp_path / "source.mp4"
+            fake_video.write_bytes(b"video_bytes")
+
+            target_mp4 = tmp_path / "output_video.mp4"
+            # 模擬上次執行被誤建為空目錄的狀況
+            target_mp4.mkdir(parents=True, exist_ok=True)
+            self.assertTrue(target_mp4.is_dir())
+
+            cfg = EditorConfig(video_path=fake_video, output_dir=target_mp4)
+            self.assertEqual(cfg.output_file, target_mp4)
+            self.assertEqual(cfg.output_dir, tmp_path)
+            # 驗證空目錄已自動被清理移除
+            self.assertFalse(target_mp4.exists())
+
+    def test_main_interactive_input_prompt(self):
+        """測試未帶 -i 與 -o 參數時，main 透過 input 引導獲取影片與輸出目標路徑。"""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_path = Path(tmp_dir)
+            fake_video = tmp_path / "interactive_test.mp4"
+            fake_video.write_bytes(b"content")
+            target_out = tmp_path / "interactive_output.mp4"
+
+            from unittest.mock import patch
+
+            inputs = [str(fake_video), str(target_out)]
+            with patch("builtins.input", side_effect=inputs), \
+                 patch("sys.argv", ["main.py"]), \
+                 patch("video_editor.cli.VideoEditorPipeline.run"):
+                main()
+
+            self.assertTrue(tmp_path.exists())
+
+
 if __name__ == "__main__":
     unittest.main()

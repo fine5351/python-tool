@@ -201,7 +201,9 @@ class TestTimeline(unittest.TestCase):
 
         self.assertIn("--model=gemini-2.5-flash-lite", fast_cmd)
         self.assertIn("--model=gemini-2.5-flash", deep_cmd)
-        self.assertIn("--model=flash", plan_cmd)
+        self.assertIn("--model=gemini-3.8-flash-medium", plan_cmd)
+        self.assertIn("-p", plan_cmd)
+        self.assertIn("--add-dir", fast_cmd)
 
     def test_cli_parses_model_flags_and_removes_no_ai(self):
         """測試 CLI 參數支援三級模型配置，且已移除舊版機械式 --no-ai 參數。"""
@@ -349,6 +351,127 @@ class TestTimeline(unittest.TestCase):
         handled2 = session.handle_slash_command("/model deep_vision pro")
         self.assertTrue(handled2)
         self.assertEqual(config.models.deep_vision, "pro")
+
+
+    def test_merge_segments_success(self):
+        """測試 EditPlan.merge_segments 成功合併相鄰段落，沿用首段 ID 並記錄 ID 映射。"""
+        segs = [
+            TimelineSegment(id=1, start=0.0, end=8.6, summary="開頭"),
+            TimelineSegment(id=2, start=8.6, end=262.2, summary="戰鬥一"),
+            TimelineSegment(id=3, start=262.2, end=299.5, summary="轉場"),
+            TimelineSegment(id=4, start=299.5, end=551.0, summary="強襲戰前半", tags=["戰鬥"]),
+            TimelineSegment(id=5, start=551.0, end=604.6, summary="強襲戰後半", tags=["通關"]),
+        ]
+        plan = EditPlan(video_path="video.mp4", total_duration=604.6, segments=segs)
+
+        merged = plan.merge_segments([4, 5])
+        self.assertEqual(merged.id, 4)
+        self.assertAlmostEqual(merged.start, 299.5)
+        self.assertAlmostEqual(merged.end, 604.6)
+        self.assertAlmostEqual(merged.duration, 305.1)
+        self.assertEqual(merged.tags, ["戰鬥", "通關"])
+        self.assertIn("強襲戰前半 + 強襲戰後半", merged.summary)
+
+        # 驗證段落清單與 sequence 已移除 #5
+        self.assertEqual([s.id for s in plan.segments], [1, 2, 3, 4])
+        self.assertEqual(plan.sequence, [1, 2, 3, 4])
+        # 驗證 ID 映射自動生效
+        self.assertEqual(plan.resolve_id(5), 4)
+
+    def test_merge_segments_non_contiguous_raises(self):
+        """測試合併不相鄰段落時正確拋出 ValueError。"""
+        segs = [
+            TimelineSegment(id=1, start=0.0, end=10.0),
+            TimelineSegment(id=2, start=20.0, end=30.0),
+        ]
+        plan = EditPlan(video_path="video.mp4", total_duration=30.0, segments=segs)
+        with self.assertRaises(ValueError):
+            plan.merge_segments([1, 2])
+
+    def test_keep_only(self):
+        """測試 EditPlan.keep_only 僅保留目標段落，其餘段落全部刪除。"""
+        segs = [
+            TimelineSegment(id=1, start=0.0, end=10.0),
+            TimelineSegment(id=2, start=10.0, end=20.0),
+            TimelineSegment(id=3, start=20.0, end=30.0),
+        ]
+        plan = EditPlan(video_path="video.mp4", total_duration=30.0, segments=segs)
+
+        kept = plan.keep_only([2])
+        self.assertEqual(kept, [2])
+        self.assertFalse(plan.get_segment(1).keep)
+        self.assertTrue(plan.get_segment(2).keep)
+        self.assertFalse(plan.get_segment(3).keep)
+        self.assertEqual(plan.sequence, [2])
+
+    def test_apply_operations_merge_and_keep_only_with_id_mapping(self):
+        """測試同一批次 apply_operations 中先 merge 再 keep_only，ID 映射能自動將舊 ID 導向新 ID。"""
+        segs = [
+            TimelineSegment(id=1, start=0.0, end=8.6),
+            TimelineSegment(id=2, start=8.6, end=262.2),
+            TimelineSegment(id=3, start=262.2, end=299.5),
+            TimelineSegment(id=4, start=299.5, end=551.0),
+            TimelineSegment(id=5, start=551.0, end=604.6),
+        ]
+        plan = EditPlan(video_path="video.mp4", total_duration=604.6, segments=segs)
+
+        ops = [
+            {"op": "merge", "segment_ids": [4, 5]},
+            {"op": "keep_only", "segment_ids": [4, 5]},
+        ]
+        logs = plan.apply_operations(ops)
+        self.assertEqual(len(logs), 2)
+
+        kept_segs = plan.get_kept_ordered_segments()
+        self.assertEqual(len(kept_segs), 1)
+        self.assertEqual(kept_segs[0].id, 4)
+        self.assertAlmostEqual(kept_segs[0].duration, 305.1)
+
+    def test_fallback_parse_dialogue(self):
+        """測試本地端 _fallback_parse_dialogue 成功解析使用者指令。"""
+        segs = [
+            TimelineSegment(id=1, start=0.0, end=8.6),
+            TimelineSegment(id=2, start=8.6, end=262.2),
+            TimelineSegment(id=3, start=262.2, end=299.5),
+            TimelineSegment(id=4, start=299.5, end=551.0),
+            TimelineSegment(id=5, start=551.0, end=604.6),
+        ]
+        plan = EditPlan(video_path="video.mp4", total_duration=604.6, segments=segs)
+        config = EditorConfig(video_path=Path("video.mp4"))
+        detector = VideoDetector(config)
+        verifier = AIVerifier(config, detector)
+
+        instruction = "將 #4、#5 整合為一個段落, 只輸出這個整合後的段落"
+        res = verifier._fallback_parse_dialogue(plan, instruction)
+        self.assertIsNotNone(res)
+        ops = res["operations"]
+        self.assertEqual(len(ops), 2)
+        self.assertEqual(ops[0]["op"], "merge")
+        self.assertEqual(ops[0]["segment_ids"], [4, 5])
+        self.assertEqual(ops[1]["op"], "keep_only")
+        self.assertEqual(ops[1]["segment_ids"], [4])
+
+    def test_export_plan_respects_config_output_file(self):
+        """測試 VideoCutter.export_plan 在設定 config.output_file 時以指定檔名輸出。"""
+        target_file = Path("custom_output/my_final_video.mp4")
+        cfg = EditorConfig(
+            video_path=Path("source.mp4"),
+            output_file=target_file,
+            dry_run=True,
+        )
+        cutter = VideoCutter(cfg)
+        plan = EditPlan(video_path="source.mp4", total_duration=305.1)
+
+        # 單一結果檔匯出
+        out_single = cutter.export_plan(plan, [[(299.5, 604.6)]])
+        self.assertEqual(len(out_single), 1)
+        self.assertEqual(out_single[0], target_file)
+
+        # 多結果檔匯出
+        out_multi = cutter.export_plan(plan, [[(0.0, 100.0)], [(100.0, 200.0)]])
+        self.assertEqual(len(out_multi), 2)
+        self.assertEqual(out_multi[0].name, "my_final_video-1.mp4")
+        self.assertEqual(out_multi[1].name, "my_final_video-2.mp4")
 
 
 if __name__ == "__main__":

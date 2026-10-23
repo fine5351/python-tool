@@ -18,15 +18,15 @@ def parse_args(args=None) -> argparse.Namespace:
         "-i",
         "--input",
         type=clean_path,
-        required=True,
-        help="輸入的影片檔案路徑 (例如: input.mp4)",
+        default=None,
+        help="輸入的影片檔案路徑 (例如: input.mp4；若省略將進入對話式引導)",
     )
     parser.add_argument(
         "-o",
         "--output",
         type=clean_path,
-        default=Path("output_parts"),
-        help="影片輸出目錄 (預設: output_parts)",
+        default=None,
+        help="影片輸出目錄或目標檔案路徑 (預設: output_parts；若指定 .mp4 等影片檔將以此檔名匯出)",
     )
     parser.add_argument(
         "--export-mode",
@@ -179,17 +179,38 @@ def main() -> None:
     """程式主進入點。"""
     args = parse_args()
 
-    if not args.input.exists():
-        print(f"錯誤：找不到指定的影片檔案 '{args.input}'", file=sys.stderr)
+    input_path = args.input
+    if input_path is None:
+        print("🎬 歡迎使用 AI 對話式智慧影片剪輯工具！")
+        while input_path is None or not input_path.exists():
+            try:
+                raw_in = input("請輸入欲剪輯的影片檔案路徑 (例如: input.mp4，輸入 q 離開): ").strip()
+            except (EOFError, KeyboardInterrupt):
+                print("\n已取消執行。")
+                sys.exit(0)
+            if raw_in.lower() in ("q", "quit", "exit"):
+                sys.exit(0)
+            if not raw_in:
+                continue
+            candidate = clean_path(raw_in)
+            if not candidate.exists():
+                print(f"⚠ 找不到指定的影片檔案 '{candidate}'，請重新輸入。")
+                continue
+            input_path = candidate
+    elif not input_path.exists():
+        print(f"錯誤：找不到指定的影片檔案 '{input_path}'", file=sys.stderr)
         sys.exit(1)
 
-    if not args.output.exists():
+    output_path = args.output
+    if output_path is None:
         try:
-            args.output.mkdir(parents=True, exist_ok=True)
-            print(f"ℹ 預期的輸出目錄不存在，已自動建立: '{args.output}'")
-        except Exception as err:
-            print(f"錯誤：無法建立輸出目錄 '{args.output}' ({err})", file=sys.stderr)
-            sys.exit(1)
+            raw_out = input("請輸入影片輸出檔案或目錄路徑 (直接按 Enter 預設 output_parts): ").strip()
+        except (EOFError, KeyboardInterrupt):
+            raw_out = ""
+        if not raw_out:
+            output_path = Path("output_parts")
+        else:
+            output_path = clean_path(raw_out)
 
     models_cfg = ModelConfig(
         fast_vision=args.model_vision_fast,
@@ -198,8 +219,8 @@ def main() -> None:
     )
 
     config_kwargs = {
-        "video_path": args.input,
-        "output_dir": args.output,
+        "video_path": input_path,
+        "output_dir": output_path,
         "plan_file": args.plan_file,
         "models": models_cfg,
         "export_mode": args.export_mode,
@@ -226,6 +247,13 @@ def main() -> None:
 
     config = EditorConfig(**config_kwargs)
 
+    if not config.output_dir.exists():
+        try:
+            config.output_dir.mkdir(parents=True, exist_ok=True)
+            print(f"ℹ 預期的輸出目錄不存在，已自動建立: '{config.output_dir}'")
+        except Exception as err:
+            print(f"錯誤：無法建立輸出目錄 '{config.output_dir}' ({err})", file=sys.stderr)
+            sys.exit(1)
     pipeline = VideoEditorPipeline(config)
     try:
         pipeline.run()
